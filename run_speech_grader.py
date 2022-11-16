@@ -107,7 +107,7 @@ def main():
                         help="random seed for initialization")
     parser.add_argument('--predictions_file', type=str, default=None)
     parser.add_argument('--score_name', type=str, default="grammar")
-    parser.add_argument('--runs_root', type=str, default="root")
+    parser.add_argument('--runs_root', type=str, default="runs")
     parser.add_argument('--exp_root', type=str, default="exp")
 
     # Auxiliary objectives

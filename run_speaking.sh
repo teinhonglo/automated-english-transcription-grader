@@ -23,13 +23,17 @@ do_upsample="false"
 
 data_dir=data-speaking/gept-p${part}/$trans_type
 exp_root=exp-speaking/gept-p${part}/$trans_type
-runs_root=runs-speaking/gept-p${part}/$trans_ype
+runs_root=runs-speaking/gept-p${part}/$trans_type
 
 set -euo pipefail
 
 if [ $stage -le 0 ] && [ $stop_stage -ge 0 ]; then  
-    rm -rf $data_dir
-    python local/convert_gept_b1_to_aetg_data.py \
+    if [ -d $data_dir ]; then
+        echo "[WARNING] $data_dir is already existed."
+        echo "Skip data preparation."
+        sleep 5
+    else
+        python local/convert_gept_b1_to_aetg_data.py \
                     --corpus_dir $corpus_dir \
                     --data_dir $data_dir \
                     --anno_fn $anno_fn \
@@ -38,6 +42,7 @@ if [ $stage -le 0 ] && [ $stop_stage -ge 0 ]; then
                     --scores "$score_names" \
                     --sheet_name $part \
                     --kfold $kfold
+    fi
 fi
 
 
@@ -45,6 +50,7 @@ if [ $stage -le 1 ] && [ $stop_stage -ge 1 ]; then
      
     for sn in $score_names; do
         for fd in $folds; do
+            # model_args_dir
             output_dir=$model_type/${sn}/${fd}
             python3 run_speech_grader.py --do_train --save_best_on_evaluate \
                                          --do_lower_case \
@@ -70,6 +76,7 @@ if [ $stage -le 2 ] && [ $stop_stage -ge 2 ]; then
     
     for sn in $score_names; do
         for fd in $folds; do
+            output_dir=$model_type/${sn}/${fd}
             model_args_dir=$model_type/${sn}/${fd}
             model_dir=$model_args_dir/best
             predictions_file="$runs_root/$model_type/${sn}/${fd}/predictions.txt"
@@ -85,6 +92,7 @@ if [ $stage -le 2 ] && [ $stop_stage -ge 2 ]; then
                                          --data_dir $data_dir/$fd \
                                          --score_name $sn \
                                          --runs_root $runs_root \
+                                         --output_dir $output_dir \
                                          --exp_root $exp_root
         done
     done 

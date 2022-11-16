@@ -67,6 +67,7 @@ if [ $stage -le 2 ] && [ $stop_stage -ge 2 ]; then
     
     for sn in $score_names; do
         for fd in $folds; do
+            output_dir=$model_type/${sn}/${fd}
             model_args_dir=$model_type/${sn}/${fd}
             #model_dir=$model_args_dir/final
             model_dir=$model_args_dir/best
@@ -80,9 +81,10 @@ if [ $stage -le 2 ] && [ $stop_stage -ge 2 ]; then
                                          --max_score $max_score \
                                          --model_dir $model_dir \
                                          --predictions_file $predictions_file \
-                                         --score_name $sn \
                                          --data_dir $data_dir/$fd \
+                                         --score_name $sn \
                                          --runs_root $runs_root \
+                                         --output_dir $output_dir \
                                          --exp_root $exp_root
         done
     done 
