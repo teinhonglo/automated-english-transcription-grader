@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from transformers import BertModel, BertTokenizer, BertConfig
-from transformers.modeling_bert import BertPreTrainedModel, BertPredictionHeadTransform
+from transformers.models.bert.modeling_bert import BertPreTrainedModel, BertPredictionHeadTransform
 
 class PredictionHead(nn.Module):
     '''
@@ -63,14 +63,14 @@ class SpeechGraderModel(BertPreTrainedModel):
         Returns:
         training_objective_predictions (dict of str: [float]): mapping of training objective to the predicted label
         """
-        bert_sequence_output, bert_pooled_output = self.bert(**batch)
+        bert_sequence_output, bert_pooled_output = self.bert(**batch, return_dict=False)
         training_objective_predictions = {}
 
         for objective in self.decoder_objectives:
-            input = bert_pooled_output if objective == 'score' else bert_sequence_output
-            decoded_objective = getattr(self, objective + '_decoder')(input)
+            scoring_input = bert_pooled_output if objective == 'score' else bert_sequence_output
+            decoded_objective = getattr(self, objective + '_decoder')(scoring_input)
             decoded_objective = self.score_scaler(decoded_objective) if objective == 'score' else decoded_objective
             training_objective_predictions[objective] = decoded_objective.view(-1, decoded_objective.shape[2]) \
                 if objective != 'score' else decoded_objective.squeeze()
-
+        
         return training_objective_predictions

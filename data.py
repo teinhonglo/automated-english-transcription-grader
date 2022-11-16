@@ -59,6 +59,8 @@ class InputExample(object):
 
 class TSVProcessor(object):
     """Processor for TSV data set"""
+    def __init__(self, score_name):
+        self.score_name = score_name
 
     def get_train_examples(self, data_dir):
         """See base class."""
@@ -82,13 +84,14 @@ class TSVProcessor(object):
             if i == 0:
                 columns = {key:header_index for header_index, key in enumerate(line)}
                 continue
-            id = "%s-%s" % (set_type, i)
+            print(line)
+            id = line[columns["text_id"]]
             tokens = line[columns['text']]
             pos_tags = line[columns['pos']].split(' ') if 'pos' in columns else ['X'] * len(tokens)
             dep_rels = line[columns['deprel']].split(' ') if 'deprel' in columns else ['X'] * len(tokens)
             dep_rels = [dep_rel.split(':')[0] for dep_rel in dep_rels]
             native_language = line[columns['l1']] if 'l1' in columns else 'X'
-            score = line[columns['score']]
+            score = line[columns[self.score_name]]
             examples.append(
                 InputExample(id=id, tokens=tokens, score=score, pos_tags=pos_tags,
                              dep_rels=dep_rels, native_language=native_language))
@@ -204,7 +207,7 @@ def convert_examples_to_features(examples, model, max_seq_length, special_tokens
                               ))
     return features
 
-def load_and_cache_vocab(data_dir, logger):
+def load_and_cache_vocab(data_dir, logger, score_name):
     vocab_file = os.path.join(data_dir, 'cached_vocab.p')
     # Load vocab from cache
     if os.path.exists(vocab_file):
@@ -213,7 +216,7 @@ def load_and_cache_vocab(data_dir, logger):
 
     # Create tokenizer
     logger.info("Creating vocab from dataset file at %s", data_dir)
-    processor = TSVProcessor()
+    processor = TSVProcessor(score_name)
     examples = processor.get_train_examples(data_dir)
     word_counts = Counter([word for example in examples for word in example.tokens.split(' ')])
     sorted_vocab = ['[PAD]', 'UNK'] + sorted(word_counts, key=word_counts.get, reverse=True)
@@ -222,9 +225,9 @@ def load_and_cache_vocab(data_dir, logger):
     pickle.dump(vocab_to_int, open(vocab_file, 'wb'))
     return vocab_to_int
 
-def load_and_cache_examples(model, data_dir, max_seq_length, special_tokens, logger, vocab=None, tokenizer=None, evaluate=False, test=False, reload=False):
+def load_and_cache_examples(model, data_dir, max_seq_length, special_tokens, logger, score_name, vocab=None, tokenizer=None, evaluate=False, test=False, reload=False):
     assert not (evaluate and test), "Cannot load validation data and test data at the same time."
-    processor = TSVProcessor()
+    processor = TSVProcessor(score_name)
     # Load data features from cache or dataset file
     file_type = 'valid' if evaluate else 'train'
     file_type = 'test'  if test else file_type

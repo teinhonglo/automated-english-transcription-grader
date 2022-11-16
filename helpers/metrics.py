@@ -17,6 +17,7 @@ def get_losses(training_objectives, training_objective_predictions, labels, devi
         batch_labels = labels[objective].reshape(-1)
         losses[objective] = criterion(prediction, batch_labels)
         losses['overall'] += (losses[objective] * alpha)
+
     return losses
 
 def compute_metrics(total_losses, all_score_predictions, all_score_targets, device):

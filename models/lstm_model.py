@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
-from transformers.modeling_bert import gelu
+from transformers.activations import ACT2FN
+gelu = ACT2FN['gelu']
 
 
 class PredictionHead(nn.Module):
@@ -102,7 +103,7 @@ class SpeechGraderModel(nn.Module):
         # Predictions per training objective
         training_objective_predictions = {}
         for objective in self.decoder_objectives:
-            input = rnn_output if objective is 'score' else rnn_sequence_output
+            scoring_input = rnn_output if objective == 'score' else rnn_sequence_output
             # Language modelling requires makes both a next and previous word prediction based on the forward and
             # backward passes respectively.
             if objective == 'lm':
@@ -112,11 +113,12 @@ class SpeechGraderModel(nn.Module):
                 lm_b_decoded = lm_b_decoded.view(-1, lm_b_decoded.shape[2])
                 decoded_objective = torch.cat((lm_f_decoded, lm_b_decoded), 0)
             else:
-                decoded_objective = getattr(self, objective + '_decoder')(input)
+                decoded_objective = getattr(self, objective + '_decoder')(scoring_input)
                 if objective == 'score':
                     decoded_objective = self.score_scaler(decoded_objective)
                 decoded_objective = decoded_objective.view(-1, decoded_objective.shape[
-                    2]) if objective is not 'score' else decoded_objective.squeeze()
+                    2]) if objective != 'score' else decoded_objective.squeeze()
+
             training_objective_predictions[objective] = decoded_objective
 
         return training_objective_predictions

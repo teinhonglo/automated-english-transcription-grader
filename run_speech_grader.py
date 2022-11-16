@@ -13,7 +13,8 @@ logger = logging.getLogger(__name__)
 # The auxiliary objectives used to train the speech grader.
 # Note that mlm (masked language modelling) can only be used for the BERT speech grader
 # and lm (language modelling) for the LSTM speech grader.
-aux_objs = ['pos', 'deprel', 'native_language', 'mlm', 'lm']
+#aux_objs = ['pos', 'deprel', 'native_language', 'mlm', 'lm']
+aux_objs = ['mlm', 'lm']
 
 
 def get_auxiliary_objectives(args, vocab_size):
@@ -62,6 +63,8 @@ def main():
                         help="Train a model.")
     parser.add_argument("--do_test", action='store_true',
                         help="Evaluate the model at --model_dir on the test set.")
+    parser.add_argument("--do_lower_case", action='store_true',
+                        help="set this flag if you are using an uncased model")
     parser.add_argument('--logging_steps', type=int, default=50,
                         help="Log every X updates steps.")
     parser.add_argument("--evaluate_during_training", action='store_true',
@@ -102,7 +105,10 @@ def main():
                        help="Overwrite the cached training, validation and testing sets")
     parser.add_argument('--seed', type=int, default=42,
                         help="random seed for initialization")
-    parser.add_argument('--predictions-file', type=str, default=None)
+    parser.add_argument('--predictions_file', type=str, default=None)
+    parser.add_argument('--score_name', type=str, default="grammar")
+    parser.add_argument('--runs_root', type=str, default="root")
+    parser.add_argument('--exp_root', type=str, default="exp")
 
     # Auxiliary objectives
     for obj in aux_objs:
@@ -130,27 +136,27 @@ def main():
     # Train a model
     if args.do_train:
         # Store training arguments to facilitate reloading a model.
-        if not os.path.exists(args.output_dir):
-            os.makedirs(args.output_dir)
-        torch.save(args, os.path.join(args.output_dir, 'training_args.bin'))
+        if not os.path.exists(os.path.join(args.exp_root, args.output_dir)):
+            os.makedirs(os.path.join(args.exp_root, args.output_dir))
+        torch.save(args, os.path.join(args.exp_root, args.output_dir, 'training_args.bin'))
         args.logger = logger
 
         if not args.model:
             args.logger.info("--model must be provided for training (['lstm', 'bert'])")
             return
         if args.model == 'lstm':
-            vocab = data.load_and_cache_vocab(args.data_dir, logger)
+            vocab = data.load_and_cache_vocab(args.data_dir, logger, args.score_name)
             training_objectives = get_auxiliary_objectives(args, len(vocab))
             grader = lstm_model.SpeechGraderModel(args, vocab, training_objectives).to(args.device)
             train_data = data.load_and_cache_examples(
                 args.model, args.data_dir, args.max_seq_length, args.special_tokens,
-                logger, vocab=vocab, reload=args.overwrite_cache)
+                logger, args.score_name, vocab=vocab, reload=args.overwrite_cache)
             dev_data = data.load_and_cache_examples(
                 args.model, args.data_dir, args.max_seq_length, args.special_tokens,
-                logger, vocab=vocab, evaluate=True, reload=args.overwrite_cache)
+                logger, args.score_name, vocab=vocab, evaluate=True, reload=args.overwrite_cache)
             trainer = train.Trainer(args, grader, training_objectives)
         elif args.model == 'bert':
-            tokenizer = BertTokenizer.from_pretrained(args.model_path, additional_special_tokens=args.special_tokens)
+            tokenizer = BertTokenizer.from_pretrained(args.model_path, additional_special_tokens=args.special_tokens, use_fast=False, do_lower_case=args.do_lower_case)
             config = BertConfig.from_pretrained(args.model_path)
             training_objectives = get_auxiliary_objectives(args, tokenizer.vocab_size)
             config.training_objectives = training_objectives
@@ -158,10 +164,10 @@ def main():
             grader = bert_model.SpeechGraderModel(config=config).to(args.device)
             train_data = data.load_and_cache_examples(
                 args.model, args.data_dir, args.max_seq_length, args.special_tokens,
-                logger, tokenizer=tokenizer, reload=args.overwrite_cache)
+                logger, args.score_name, tokenizer=tokenizer, reload=args.overwrite_cache)
             dev_data = data.load_and_cache_examples(
                 args.model, args.data_dir, args.max_seq_length, args.special_tokens,
-                logger, tokenizer=tokenizer, evaluate=True, reload=args.overwrite_cache)
+                logger, args.score_name, tokenizer=tokenizer, evaluate=True, reload=args.overwrite_cache)
             trainer = train.Trainer(args, grader, training_objectives, bert_tokenizer=tokenizer)
         else:
             args.logger.info("--model must be either 'lstm' or 'bert'")
@@ -172,29 +178,30 @@ def main():
     if args.do_test:
         # Retrieve training arguments to facilitate reloading the model.
         args.logger = logger
-        train_args = torch.load(os.path.join(args.model_args_dir, 'training_args.bin'))
+        train_args = torch.load(os.path.join(args.exp_root, args.model_args_dir, 'training_args.bin'))
+        train_args.device = args.device
         train_args.predictions_file = args.predictions_file
         train_args.logger = logger
 
         if train_args.model == 'lstm':
             # use the vocabulary from train time
-            vocab = data.load_and_cache_vocab(train_args.data_dir, logger)
+            vocab = data.load_and_cache_vocab(train_args.data_dir, logger, arge.score_name)
             training_objectives = get_auxiliary_objectives(train_args, len(vocab))
             grader = lstm_model.SpeechGraderModel(args, vocab, training_objectives).to(args.device)
-            grader.load_state_dict(torch.load(os.path.join(args.model_dir, 'lstm.model')))
+            grader.load_state_dict(torch.load(os.path.join(args.exp_root, args.model_dir, 'lstm.model')))
             test_data = data.load_and_cache_examples(
                 train_args.model, args.data_dir, train_args.max_seq_length, train_args.special_tokens,
-                logger, vocab=vocab, test=True, reload=args.overwrite_cache)
+                logger, args.score_name, vocab=vocab, test=True, reload=args.overwrite_cache)
             trainer = train.Trainer(train_args, grader, training_objectives)
 
         else:
-            tokenizer = BertTokenizer.from_pretrained(args.model_dir, do_lower_case=True)
+            tokenizer = BertTokenizer.from_pretrained(os.path.join(args.exp_root, args.model_dir), do_lower_case=args.do_lower_case)
             training_objectives = get_auxiliary_objectives(train_args, tokenizer.vocab_size)
-            config = BertConfig.from_pretrained(args.model_dir)
-            grader = bert_model.SpeechGraderModel.from_pretrained(args.model_dir, config=config).to(args.device)
+            config = BertConfig.from_pretrained(os.path.join(args.exp_root, args.model_dir))
+            grader = bert_model.SpeechGraderModel.from_pretrained(os.path.join(args.exp_root, args.model_dir), config=config).to(args.device)
             test_data = data.load_and_cache_examples(
                 train_args.model, args.data_dir, train_args.max_seq_length, train_args.special_tokens,
-                logger, tokenizer=tokenizer, test=True, reload=args.overwrite_cache)
+                logger, args.score_name, tokenizer=tokenizer, test=True, reload=args.overwrite_cache)
             trainer = train.Trainer(train_args, grader, training_objectives, bert_tokenizer=tokenizer)
         trainer.test(test_data)
 

@@ -2,7 +2,7 @@ import numpy as np
 import io
 import os
 
-from transformers import AdamW, WarmupLinearSchedule
+from transformers import AdamW, get_linear_schedule_with_warmup 
 import random
 from tensorboardX import SummaryWriter
 import torch
@@ -31,7 +31,7 @@ class Trainer:
         accordance with the provided ags.
         """
         self.eval_data = valid_data
-        tb_writer = SummaryWriter(os.path.join('runs', self.args.output_dir))
+        tb_writer = SummaryWriter(os.path.join(self.args.runs_root, self.args.output_dir))
         train_sampler = RandomSampler(train_data)
         train_dataloader = DataLoader(train_data, sampler=train_sampler, batch_size=self.args.train_batch_size)
 
@@ -51,7 +51,7 @@ class Trainer:
              'weight_decay': 0.0}
         ]
         optimizer = AdamW(optimizer_grouped_parameters, lr=self.args.learning_rate, eps=self.args.adam_epsilon)
-        scheduler = WarmupLinearSchedule(optimizer, warmup_steps=self.args.warmup_steps, t_total=t_total)
+        scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=self.args.warmup_steps, num_training_steps=t_total)
 
         self.args.logger.info("***** Running training *****")
         self.args.logger.info("  Num examples = %d", len(train_data))
@@ -90,7 +90,7 @@ class Trainer:
         Tests the model on the provided test_data.
         """
         self.eval_data = test_data
-        tb_writer = SummaryWriter(os.path.join('runs', self.args.output_dir))
+        tb_writer = SummaryWriter(os.path.join(self.args.runs_root, self.args.output_dir))
         results = self.evaluate(writer=tb_writer, prefix=prefix, verbose=True)
         tb_writer.close()
         return results
@@ -133,7 +133,7 @@ class Trainer:
         # Record model score predictions
         if self.args.predictions_file:
             with io.open(self.args.predictions_file, 'w') as file:
-                predictions = '\n'.join([str(score) for score in all_score_predictions.cpu().tolist()])
+                predictions = '\n'.join(['{} | {}'.format(str(pred), str(target)) for pred, target in zip(all_score_predictions.cpu().tolist(), all_score_targets.cpu().tolist())])
                 file.write(predictions)
                 self.args.logger.info("Predictions stored at ".format(self.args.predictions_file))
 
@@ -144,6 +144,8 @@ class Trainer:
         self.args.logger.info("***** Eval results {} *****".format(prefix))
         for key in sorted(total_losses.keys()):
             self.args.logger.info("  %s = %s", key, str(total_losses[key]))
+            #print(all_score_targets)
+            #print(all_score_predictions)
         if verbose and writer:
             header_row = 'Predicted score | Actual score\n---|---\n'
             table_rows = ['{} | {}'.format(pred, target) for pred, target in
@@ -216,7 +218,7 @@ class Trainer:
             if self.args.logging_steps > 0 and self.global_step % self.args.logging_steps == 0:
                 # Log metrics
                 if self.args.evaluate_during_training:
-                    results = self.evaluate(tb_writer)
+                    results = self.evaluate(tb_writer, verbose=True)
                     for key, value in results.items():
                         tb_writer.add_scalar('eval_{}'.format(key), value, self.global_step)
                     if self.args.save_all_checkpoints:
@@ -236,7 +238,7 @@ class Trainer:
 
     def _save_model(self, prefix):
         """Saves model at --output_dir/prefix"""
-        output_dir = os.path.join(self.args.output_dir, prefix)
+        output_dir = os.path.join(self.args.exp_root, self.args.output_dir, prefix)
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
 
