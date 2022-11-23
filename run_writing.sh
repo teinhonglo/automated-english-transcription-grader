@@ -14,28 +14,44 @@ model_type=bert-model
 model_path=bert-base-uncased
 max_score=8
 max_seq_length=512
+test_on_valid="true"
 trans_type="origin"
+extra_options=""
 
 . ./path.sh
 . ./parse_options.sh
+
+
 
 data_dir=data-writting/gsat109/$trans_type
 exp_root=exp-writting/gsat109/$trans_type
 runs_root=runs-writting/gsat109/$trans_type
 
+if [ "$test_on_valid" == "true" ]; then
+    extra_options="--test_on_valid"
+    data_dir=${data_dir}_tov
+    exp_root=${exp_root}_tov
+    runs_root=${runs_root}_tov
+fi
+
 set -euo pipefail
 
 if [ $stage -le 0 ] && [ $stop_stage -ge 0 ]; then  
-    rm -rf $data_dir
-    python local/convert_gsat_to_aetg_data.py \
-                --corpus_dir $corpus_dir \
-                --data_dir $data_dir \
-                --anno_fn $anno_fn \
-                --id_column "編號名" \
-                --text_column "作文(工讀生校正)" \
-                --scores "$score_names" \
-                --kfold $kfold
-                                            
+    if [ -d $data_dir ]; then
+        echo "[NOTICE] $data_dir is already existed."
+        echo "Skip data preparation."
+        sleep 5
+    else
+        
+        python local/convert_gsat_to_aetg_data.py \
+                        --corpus_dir $corpus_dir \
+                        --data_dir $data_dir \
+                        --anno_fn $anno_fn \
+                        --id_column "編號名" \
+                        --text_column "作文(工讀生校正)" \
+                        --scores "$score_names" \
+                        --kfold $kfold $extra_options
+    fi
 fi
 
 if [ $stage -le 1 ] && [ $stop_stage -ge 1 ]; then  
@@ -54,7 +70,7 @@ if [ $stage -le 1 ] && [ $stop_stage -ge 1 ]; then
                                          --output_dir $output_dir \
                                          --score_name $sn \
                                          --data_dir $data_dir/$fd \
-                                         --runs_root $runs_root \
+                                         --runs_root $runs_root/$model_type/$sn/$fd \
                                          --exp_root $exp_root
                                          #--warmup_step 1320 \
         done
@@ -70,7 +86,7 @@ if [ $stage -le 2 ] && [ $stop_stage -ge 2 ]; then
             output_dir=$model_type/${sn}/${fd}
             model_args_dir=$model_type/${sn}/${fd}
             #model_dir=$model_args_dir/final
-            model_dir=$model_args_dir/best
+            model_dir=$model_args_dir/final
             predictions_file="$runs_root/$model_type/${sn}/${fd}/predictions.txt"
             
             python3 run_speech_grader.py --do_test --model bert \
@@ -83,7 +99,7 @@ if [ $stage -le 2 ] && [ $stop_stage -ge 2 ]; then
                                          --predictions_file $predictions_file \
                                          --data_dir $data_dir/$fd \
                                          --score_name $sn \
-                                         --runs_root $runs_root \
+                                         --runs_root $runs_root/$model_type/$sn/$fd \
                                          --output_dir $output_dir \
                                          --exp_root $exp_root
         done

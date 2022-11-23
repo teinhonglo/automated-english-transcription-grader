@@ -15,21 +15,30 @@ model_path=bert-base-uncased
 max_score=8
 max_seq_length=512
 part=3
+test_on_valid="true"
 trans_type="trans_stt"
-do_upsample="false"
+extra_options=
 
 . ./path.sh
 . ./parse_options.sh
+
 
 data_dir=data-speaking/gept-p${part}/$trans_type
 exp_root=exp-speaking/gept-p${part}/$trans_type
 runs_root=runs-speaking/gept-p${part}/$trans_type
 
+if [ "$test_on_valid" == "true" ]; then
+    extra_options="--test_on_valid"
+    data_dir=${data_dir}_tov
+    exp_root=${exp_root}_tov
+    runs_root=${runs_root}_tov
+fi
+
 set -euo pipefail
 
 if [ $stage -le 0 ] && [ $stop_stage -ge 0 ]; then  
     if [ -d $data_dir ]; then
-        echo "[WARNING] $data_dir is already existed."
+        echo "[NOTICE] $data_dir is already existed."
         echo "Skip data preparation."
         sleep 5
     else
@@ -41,7 +50,7 @@ if [ $stage -le 0 ] && [ $stop_stage -ge 0 ]; then
                     --text_column "$trans_type" \
                     --scores "$score_names" \
                     --sheet_name $part \
-                    --kfold $kfold
+                    --kfold $kfold $extra_options
     fi
 fi
 
@@ -56,7 +65,7 @@ if [ $stage -le 1 ] && [ $stop_stage -ge 1 ]; then
                                          --do_lower_case \
                                          --model bert \
                                          --model_path bert-base-uncased \
-                                         --num_train_epochs 9 \
+                                         --num_train_epochs 3 \
                                          --logging_steps 20 \
                                          --gradient_accumulation_steps 1 \
                                          --max_seq_length $max_seq_length \
@@ -64,7 +73,7 @@ if [ $stage -le 1 ] && [ $stop_stage -ge 1 ]; then
                                          --output_dir $output_dir \
                                          --score_name $sn \
                                          --data_dir $data_dir/$fd \
-                                         --runs_root $runs_root \
+                                         --runs_root $runs_root/$model_type/$sn/$fd \
                                          --exp_root $exp_root
         done
     done
@@ -78,7 +87,7 @@ if [ $stage -le 2 ] && [ $stop_stage -ge 2 ]; then
         for fd in $folds; do
             output_dir=$model_type/${sn}/${fd}
             model_args_dir=$model_type/${sn}/${fd}
-            model_dir=$model_args_dir/best
+            model_dir=$model_args_dir/final
             predictions_file="$runs_root/$model_type/${sn}/${fd}/predictions.txt"
             
             python3 run_speech_grader.py --do_test --model bert \
@@ -91,7 +100,7 @@ if [ $stage -le 2 ] && [ $stop_stage -ge 2 ]; then
                                          --predictions_file $predictions_file \
                                          --data_dir $data_dir/$fd \
                                          --score_name $sn \
-                                         --runs_root $runs_root \
+                                         --runs_root $runs_root/$model_type/$sn/$fd \
                                          --output_dir $output_dir \
                                          --exp_root $exp_root
         done

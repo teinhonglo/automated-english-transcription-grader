@@ -3,6 +3,7 @@ import random
 import logging
 import os
 import csv
+from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 import pandas as pd
 
@@ -40,6 +41,8 @@ parser.add_argument("--kfold",
                     default=5,
                     type=int)
 
+parser.add_argument("--test_on_valid",
+                    action="store_true")
 
 args = parser.parse_args()
 
@@ -78,15 +81,25 @@ kf = KFold(n_splits=kfold, random_state=66, shuffle=True)
 
 tsv_df = pd.DataFrame.from_dict(tsv_dict)
 
-for i, (train_index, test_index) in enumerate(kf.split(tsv_df)):
+if args.test_on_valid:
+    all_train_df = tsv_df
+else:
+    all_train_df, test_df = train_test_split(tsv_df, test_size=0.2, random_state=66)
+
+for i, (train_index, valid_index) in enumerate(kf.split(all_train_df)):
     kfold_dir = str(i+1)
     result_dir = os.path.join(data_dir, kfold_dir)
     
     if not os.path.isdir(result_dir):
         os.makedirs(result_dir)
     
-    train_df, test_df = tsv_df.iloc[train_index], tsv_df.iloc[test_index] 
+    train_df, valid_df = all_train_df.iloc[train_index], all_train_df.iloc[valid_index] 
     
     train_df.to_csv(os.path.join(result_dir, "train.tsv"), header=xlsx_headers, sep="\t", index=False)
-    test_df.to_csv(os.path.join(result_dir, "valid.tsv"), header=xlsx_headers, sep="\t", index=False)
-    test_df.to_csv(os.path.join(result_dir, "test.tsv"), header=xlsx_headers, sep="\t", index=False)    
+    valid_df.to_csv(os.path.join(result_dir, "valid.tsv"), header=xlsx_headers, sep="\t", index=False)
+    
+    if args.test_on_valid:
+        test_df = valid_df
+    
+    test_df.to_csv(os.path.join(result_dir, "test.tsv"), header=xlsx_headers, sep="\t", index=False)
+
