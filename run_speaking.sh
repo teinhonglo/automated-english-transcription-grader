@@ -65,7 +65,7 @@ if [ $stage -le 1 ] && [ $stop_stage -ge 1 ]; then
                                          --do_lower_case \
                                          --model bert \
                                          --model_path bert-base-uncased \
-                                         --num_train_epochs 3 \
+                                         --num_train_epochs 6 \
                                          --logging_steps 20 \
                                          --gradient_accumulation_steps 1 \
                                          --max_seq_length $max_seq_length \
