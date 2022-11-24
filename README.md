@@ -4,7 +4,7 @@
 This repository includes code to replicate experiments in the [Investigating the effect of auxiliary objectives for the automated grading of learner English speech transcriptions (ACL2020)](https://www.aclweb.org/anthology/2020.acl-main.206.pdf) paper. It provides the LSTM and BERT speech grader models with sequence labelling auxiliary objective prediction heads, code for training and evaluating the models and code for data preparation from TSV files. Please cite our paper when using our code.
 
 ## Installation
-This project was developed using Python 3.6.9, [PyTorch](https://pytorch.org/) and [Transformers](https://github.com/huggingface/transformers). To install the project, use the following commands:
+This project was developed using Python 3.8.13, [PyTorch](https://pytorch.org/) and [Transformers](https://github.com/huggingface/transformers). To install the project, use the following commands:
 ```
 $ git clone https://github.com/hcraighead/automated-english-transcription-grader.git
 $ cd automated-english-transcription-grader
