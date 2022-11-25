@@ -44,6 +44,9 @@ parser.add_argument("--kfold",
 parser.add_argument("--test_on_valid",
                     action="store_true")
 
+parser.add_argument("--do_upsample",
+                    action="store_true")
+
 args = parser.parse_args()
 
 corpus_dir = args.corpus_dir
@@ -57,7 +60,7 @@ sheet_name = args.sheet_name
 
 xlsx_headers = ["text_id", "text" ] + scores
 tsv_dict = {h:[] for h in xlsx_headers}
-anno_df = pd.read_excel(anno_path, sheet_name="3", converters={id_column:str})
+anno_df = pd.read_excel(anno_path, sheet_name=sheet_name, converters={id_column:str})
 
 
 for i, text_id in tqdm(enumerate(anno_df[id_column])):
@@ -95,6 +98,7 @@ for i, (train_index, valid_index) in enumerate(kf.split(all_train_df)):
     
     train_df, valid_df = all_train_df.iloc[train_index], all_train_df.iloc[valid_index] 
     
+
     train_df.to_csv(os.path.join(result_dir, "train.tsv"), header=xlsx_headers, sep="\t", index=False)
     valid_df.to_csv(os.path.join(result_dir, "valid.tsv"), header=xlsx_headers, sep="\t", index=False)
     
