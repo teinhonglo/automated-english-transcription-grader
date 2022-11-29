@@ -64,6 +64,7 @@ class Trainer:
         self.tr_loss, self.logging_loss = 0.0, 0.0
         self.grader.zero_grad()
         self.best_valid_loss = float('inf')
+        self.best_train_loss = float('inf')
         train_iterator = trange(int(self.args.num_train_epochs), desc="Epoch", disable=False)
 
         try:
@@ -223,12 +224,18 @@ class Trainer:
                         tb_writer.add_scalar('eval_{}'.format(key), value, self.global_step)
                     if self.args.save_all_checkpoints:
                         self._save_model('checkpoint_{}'.format(self.global_step))
-
+                    
+                    if self.args.save_best_on_train:
+                        if train_loss < self.best_train_loss:
+                            self.best_train_loss = train_loss
+                            self._save_model('best_train')
+                    
                     if self.args.save_best_on_evaluate:
                         if results['score'] >= self.best_valid_loss:
                             return
                         self.best_valid_loss = results['score']
                         self._save_model('best')
+                    
 
                 tb_writer.add_scalar('lr', scheduler.get_lr()[0], self.global_step)
                 tb_writer.add_scalar('train_loss', train_loss, self.global_step)

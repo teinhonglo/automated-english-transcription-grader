@@ -75,13 +75,9 @@ def evaluation(total_losses, evaluate_dict, target_score="organization", np_bins
     if np_bins is not None:
         all_score_preds = np.digitize(all_score_preds, np_bins)
         all_score_annos = np.digitize(all_score_annos, np_bins)
-        
-    compute_metrics(total_losses["origin"], all_score_preds, all_score_annos)
-    # 2. mapping to CEFR 
-    # MSE, PCC, within0.5, within1.0
-    all_score_preds = np.array(all_score_preds)
-    all_score_annos = np.array(all_score_annos)
     
+    compute_metrics(total_losses["origin"], all_score_preds, all_score_annos)
+     
     return total_losses
 
 
@@ -137,8 +133,8 @@ for score in scores.split():
         total_losses[score][nf] = {}
         total_losses[score][nf] = evaluation(total_losses[score][nf], csv_dict[nf], score)
         
-    ave_losses = {k:0 for k in list(total_losses[score]["1"]["origin"].keys())}
-    df_losses = {k:[] for k in list(total_losses[score][nf]["origin"].keys())}
+    ave_losses = {k:0 for k in list(total_losses[score][n_folds[0]]["origin"].keys())}
+    df_losses = {k:[] for k in list(total_losses[score][n_folds[0]]["origin"].keys())}
     
     for nf in n_folds: 
         for metric in list(total_losses[score][nf]["origin"].keys()):
@@ -150,17 +146,17 @@ for score in scores.split():
     df_losses = pd.DataFrame.from_dict(df_losses)
     print(df_losses.mean())
 
-
+print()
 print("CEFR")
 cefr_bins = np.array([2.5, 4.5, 6.5])
-for score in scores.split():
-    
+
+for score in scores.split():   
     for nf in n_folds: 
         total_losses[score][nf] = {}
         total_losses[score][nf] = evaluation(total_losses[score][nf], csv_dict[nf], score, cefr_bins)
         
-    ave_losses = {k:0 for k in list(total_losses[score]["1"]["origin"].keys())}
-    df_losses = {k:[] for k in list(total_losses[score][nf]["origin"].keys())}
+    ave_losses = {k:0 for k in list(total_losses[score][n_folds[0]]["origin"].keys())}
+    df_losses = {k:[] for k in list(total_losses[score][n_folds[0]]["origin"].keys())}
     
     for nf in n_folds: 
         for metric in list(total_losses[score][nf]["origin"].keys()):

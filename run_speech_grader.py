@@ -71,6 +71,8 @@ def main():
                         help="Run evaluation during training at each logging step.")
     parser.add_argument('--save_best_on_evaluate', action='store_true',
                         help="Save best model based on evaluation scoring loss.")
+    parser.add_argument('--save_best_on_train', action='store_true',
+                        help="Save best model based on train scoring loss.")
     parser.add_argument("--save_all_checkpoints", action='store_true',
                        help="Evaluate all checkpoints starting with the same prefix as model_name ending and ending with step number")
 

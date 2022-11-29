@@ -47,6 +47,9 @@ parser.add_argument("--test_on_valid",
 parser.add_argument("--do_upsample",
                     action="store_true")
 
+parser.add_argument("--merge_below_b1",
+                    action="store_true")
+
 args = parser.parse_args()
 
 corpus_dir = args.corpus_dir
@@ -74,7 +77,13 @@ for i, text_id in tqdm(enumerate(anno_df[id_column])):
     tsv_dict["text"].append(text)
     
     for score in scores:
-        tsv_dict[score].append(anno_df[score][i])
+        anno_score = anno_df[score][i]
+        
+        if args.merge_below_b1:
+            if anno_score <= 4:
+                anno_score = 4
+            
+        tsv_dict[score].append(anno_score)
     
     before_text_id = text_id
 
@@ -96,8 +105,8 @@ for i, (train_index, valid_index) in enumerate(kf.split(all_train_df)):
     if not os.path.isdir(result_dir):
         os.makedirs(result_dir)
     
-    train_df, valid_df = all_train_df.iloc[train_index], all_train_df.iloc[valid_index] 
-    
+    train_df, valid_df = all_train_df.iloc[train_index], all_train_df.iloc[valid_index]
+     
 
     train_df.to_csv(os.path.join(result_dir, "train.tsv"), header=xlsx_headers, sep="\t", index=False)
     valid_df.to_csv(os.path.join(result_dir, "valid.tsv"), header=xlsx_headers, sep="\t", index=False)
