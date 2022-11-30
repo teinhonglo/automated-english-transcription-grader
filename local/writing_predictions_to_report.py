@@ -42,26 +42,28 @@ args = parser.parse_args()
 
 def filled_csv(csv_dict, result_root, score, nf, text_ids):
     
-    pred_path = os.path.join(result_root, score, nf, "predictions.txt")
+    kfold_dir = os.path.join(result_root, score, nf) 
+    pred_path = os.path.join(kfold_dir, "predictions.txt")
         
     with open(pred_path, "r") as fn:
         for i, line in enumerate(fn.readlines()):
             text_id = text_ids[nf][i]
             pred_score, anno_score = line.split("|")
-            pred_score = pred_score.split()[0]
-            anno_score = anno_score.split()[0]
+            pred_score = float(pred_score.split()[0])
+            anno_score = float(anno_score.split()[0])
             
-            #assert float(csv_dict[nf][text_id]["anno"][score]) == anno_score    
+            #print(score, i, nf, int(csv_dict[nf][text_id]["anno"][score]), int(anno_score)) 
+            assert int(csv_dict[nf][text_id]["anno"][score]) == int(anno_score)
             csv_dict[nf][text_id]["pred"][score] = pred_score
     return
 
 
-def evaluation(total_losses, evaluate_dict, target_score="organization", np_bins=None):
+def evaluation(total_losses_score_nf, evaluate_dict, target_score="organization", np_bins=None):
     # 1. origin
     # MSE, PCC, within0.5, within1.0
     all_score_preds = []
     all_score_annos = []
-    total_losses["origin"] = {}
+    total_losses_score_nf["origin"] = {}
     
     for text_id, scores_info in evaluate_dict.items(): 
         pred_score = float(scores_info["pred"][target_score])
@@ -76,13 +78,9 @@ def evaluation(total_losses, evaluate_dict, target_score="organization", np_bins
         all_score_preds = np.digitize(all_score_preds, np_bins)
         all_score_annos = np.digitize(all_score_annos, np_bins)
         
-    compute_metrics(total_losses["origin"], all_score_preds, all_score_annos)
-    # 2. mapping to CEFR 
-    # MSE, PCC, within0.5, within1.0
-    all_score_preds = np.array(all_score_preds)
-    all_score_annos = np.array(all_score_annos)
+    compute_metrics(total_losses_score_nf["origin"], all_score_preds, all_score_annos)
     
-    return total_losses
+    return total_losses_score_nf, all_score_preds, all_score_annos
 
 
 data_dir = args.data_dir
@@ -127,6 +125,12 @@ for nf in n_folds:
 total_losses = defaultdict(dict)
 total_df_losses = defaultdict(dict)
 average_losses = defaultdict(dict)
+infos = ["anno", "anno(cefr)", "pred", "pred(cefr)"]
+kfold_info = {}
+
+for score in scores.split():
+    kfold_info[score] = {str(1+i):{info:[] for info in infos} for i in range(len(n_folds))}
+    kfold_info[score]["All"] = {info:[] for info in infos}
 
 for nf in n_folds:
     for score in scores.split():
@@ -137,10 +141,16 @@ for score in scores.split():
     
     for nf in n_folds: 
         total_losses[score][nf] = {}
-        total_losses[score][nf] = evaluation(total_losses[score][nf], csv_dict[nf], score)
+        total_losses[score][nf], all_score_preds, all_score_annos = evaluation(total_losses[score][nf], csv_dict[nf], score)
+        kfold_dir = os.path.join(result_root, score, nf) 
+        kfold_info[score][nf]["anno"] += all_score_annos.tolist()
+        kfold_info[score][nf]["pred"] += all_score_preds.tolist() 
+        kfold_info[score]["All"]["anno"] += all_score_annos.tolist()
+        kfold_info[score]["All"]["pred"] += all_score_preds.tolist()
+        #fig = csv_dict[nf].plot.scatter(figsize=(20, 16), fontsize=26).get_figure()
         
-    ave_losses = {k:0 for k in list(total_losses[score]["1"]["origin"].keys())}
-    df_losses = {k:[] for k in list(total_losses[score][nf]["origin"].keys())}
+    ave_losses = {k:0 for k in list(total_losses[score][n_folds[0]]["origin"].keys())}
+    df_losses = {k:[] for k in list(total_losses[score][n_folds[0]]["origin"].keys())}
     
     for nf in n_folds: 
         for metric in list(total_losses[score][nf]["origin"].keys()):
@@ -152,18 +162,31 @@ for score in scores.split():
     df_losses = pd.DataFrame.from_dict(df_losses)
     print(df_losses.mean())
 
-
+print()
 print("CEFR")
 cefr_bins = np.array([2.5, 4.5, 6.5])
+
 for score in scores.split():
     
     for nf in n_folds: 
         total_losses[score][nf] = {}
-        total_losses[score][nf] = evaluation(total_losses[score][nf], csv_dict[nf], score, cefr_bins)
+        total_losses[score][nf], all_score_preds, all_score_annos = evaluation(total_losses[score][nf], csv_dict[nf], score, cefr_bins)
+        kfold_dir = os.path.join(result_root, score, nf) 
         
-    ave_losses = {k:0 for k in list(total_losses[score]["1"]["origin"].keys())}
-    df_losses = {k:[] for k in list(total_losses[score][nf]["origin"].keys())}
+        kfold_info[score][nf]["anno(cefr)"] += all_score_annos.tolist()
+        kfold_info[score][nf]["pred(cefr)"] += all_score_preds.tolist() 
+        kfold_info[score]["All"]["anno(cefr)"] += all_score_annos.tolist()
+        kfold_info[score]["All"]["pred(cefr)"] += all_score_preds.tolist()
+        
+    result_dir = os.path.join(result_root, score)
+    with pd.ExcelWriter(os.path.join(result_dir, "kfold_detail.xlsx")) as writer:
+        for f in list(kfold_info[score].keys()):
+            df = pd.DataFrame(kfold_info[score][f])
+            df.to_excel(writer, sheet_name=f)   
     
+    ave_losses = {k:0 for k in list(total_losses[score][n_folds[0]]["origin"].keys())}
+    df_losses = {k:[] for k in list(total_losses[score][n_folds[0]]["origin"].keys())}
+        
     for nf in n_folds: 
         for metric in list(total_losses[score][nf]["origin"].keys()):
             ave_losses[metric] += 1/len(n_folds) * total_losses[score][nf]["origin"][metric]

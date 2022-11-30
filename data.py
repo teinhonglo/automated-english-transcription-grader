@@ -83,8 +83,8 @@ class TSVProcessor(object):
         for (i, line) in enumerate(lines):
             if i == 0:
                 columns = {key:header_index for header_index, key in enumerate(line)}
+                print(columns)
                 continue
-            print(line)
             id = line[columns["text_id"]]
             tokens = line[columns['text']]
             pos_tags = line[columns['pos']].split(' ') if 'pos' in columns else ['X'] * len(tokens)
@@ -231,10 +231,11 @@ def load_and_cache_examples(model, data_dir, max_seq_length, special_tokens, log
     # Load data features from cache or dataset file
     file_type = 'valid' if evaluate else 'train'
     file_type = 'test'  if test else file_type
-    cached_features_file = os.path.join(data_dir, 'cached_{}_{}_{}'.format(
+    cached_features_file = os.path.join(data_dir, 'cached_{}_{}_{}_{}'.format(
         model,
         file_type,
-        str(max_seq_length)))
+        str(max_seq_length),
+        score_name))
     if not reload and os.path.exists(cached_features_file):
         logger.info("Loading features from cached file %s", cached_features_file)
         features = torch.load(cached_features_file)

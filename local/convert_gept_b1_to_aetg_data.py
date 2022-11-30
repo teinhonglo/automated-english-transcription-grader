@@ -44,9 +44,6 @@ parser.add_argument("--kfold",
 parser.add_argument("--test_on_valid",
                     action="store_true")
 
-parser.add_argument("--do_upsample",
-                    action="store_true")
-
 parser.add_argument("--merge_below_b1",
                     action="store_true")
 
@@ -106,13 +103,12 @@ for i, (train_index, valid_index) in enumerate(kf.split(all_train_df)):
         os.makedirs(result_dir)
     
     train_df, valid_df = all_train_df.iloc[train_index], all_train_df.iloc[valid_index]
-     
-
+    
     train_df.to_csv(os.path.join(result_dir, "train.tsv"), header=xlsx_headers, sep="\t", index=False)
     valid_df.to_csv(os.path.join(result_dir, "valid.tsv"), header=xlsx_headers, sep="\t", index=False)
     
     if args.test_on_valid:
         test_df = valid_df
-    
+     
     test_df.to_csv(os.path.join(result_dir, "test.tsv"), header=xlsx_headers, sep="\t", index=False)
 

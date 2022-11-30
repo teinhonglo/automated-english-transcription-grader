@@ -59,7 +59,7 @@ if [ $stage -le 1 ] && [ $stop_stage -ge 1 ]; then
     for sn in $score_names; do
         for fd in $folds; do
             output_dir=$model_type/${sn}/${fd}
-            python3 run_speech_grader.py --do_train --save_best_on_evaluate \
+            python3 run_speech_grader.py --do_train --save_best_on_evaluate --save_best_on_train \
                                          --do_lower_case \
                                          --model bert \
                                          --model_path bert-base-uncased \
@@ -70,7 +70,7 @@ if [ $stage -le 1 ] && [ $stop_stage -ge 1 ]; then
                                          --output_dir $output_dir \
                                          --score_name $sn \
                                          --data_dir $data_dir/$fd \
-                                         --runs_root $runs_root/$model_type/$sn/$fd \
+                                         --runs_root $runs_root \
                                          --exp_root $exp_root
                                          #--warmup_step 1320 \
         done
@@ -85,9 +85,8 @@ if [ $stage -le 2 ] && [ $stop_stage -ge 2 ]; then
         for fd in $folds; do
             output_dir=$model_type/${sn}/${fd}
             model_args_dir=$model_type/${sn}/${fd}
-            #model_dir=$model_args_dir/final
             model_dir=$model_args_dir/final
-            predictions_file="$runs_root/$model_type/${sn}/${fd}/predictions.txt"
+            predictions_file="$runs_root/$output_dir/predictions.txt"
             
             python3 run_speech_grader.py --do_test --model bert \
                                          --do_lower_case \
@@ -99,7 +98,7 @@ if [ $stage -le 2 ] && [ $stop_stage -ge 2 ]; then
                                          --predictions_file $predictions_file \
                                          --data_dir $data_dir/$fd \
                                          --score_name $sn \
-                                         --runs_root $runs_root/$model_type/$sn/$fd \
+                                         --runs_root $runs_root \
                                          --output_dir $output_dir \
                                          --exp_root $exp_root
         done
@@ -110,5 +109,5 @@ if [ $stage -le 3 ] && [ $stop_stage -ge 3 ]; then
     python local/writing_predictions_to_report.py   --data_dir $data_dir \
                                                     --result_root $runs_root/$model_type \
                                                     --folds "$folds" \
-                                                    --scores "$score_names"
+                                                    --scores "$score_names" > $runs_root/$model_type/report.log
 fi

@@ -17,6 +17,15 @@ def get_losses(training_objectives, training_objective_predictions, labels, devi
         batch_labels = labels[objective].reshape(-1)
         losses[objective] = criterion(prediction, batch_labels)
         losses['overall'] += (losses[objective] * alpha)
+        
+        #if objective == 'score':
+        #    rand_indices = torch.randperm(batch_labels.size()[0])
+        #    prediction_shuffle = prediction[rand_indices]
+        #    batch_labels_shuffle = batch_labels[rand_indices]
+        #    prediction_interval = torch.abs(prediction - prediction_shuffle)
+        #    batch_labels_interval = torch.abs(batch_labels - batch_labels_shuffle)
+        #    losses['score_l2r'] = criterion(prediction_interval, batch_labels_interval)
+        #    losses['overall'] = 0.8 * losses['overall'] + 0.2 * losses['score_l2r']
 
     return losses
 
