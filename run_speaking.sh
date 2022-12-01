@@ -16,7 +16,9 @@ max_score=8
 max_seq_length=512
 part=3
 test_on_valid="true"
+merge_below_b1="false"
 trans_type="trans_stt"
+n_resample="false"
 extra_options=
 
 . ./path.sh
@@ -33,6 +35,20 @@ if [ "$test_on_valid" == "true" ]; then
     exp_root=${exp_root}_tov
     runs_root=${runs_root}_tov
 fi
+
+if [ "$merge_below_b1" == "true" ]; then
+    extra_options="$extra_options --merge_below_b1"
+    data_dir=${data_dir}_bb1
+    exp_root=${exp_root}_bb1
+    runs_root=${runs_root}_bb1
+fi
+
+#if [ "$n_resample" != "e" ]; then
+#    extra_options="$extra_options --do_resample"
+#    data_dir=${data_dir}_rs
+#    exp_root=${exp_root}_rs
+#    runs_root=${runs_root}_rs
+#fi
 
 set -euo pipefail
 
@@ -61,7 +77,7 @@ if [ $stage -le 1 ] && [ $stop_stage -ge 1 ]; then
         for fd in $folds; do
             # model_args_dir
             output_dir=$model_type/${sn}/${fd}
-            python3 run_speech_grader.py --do_train --save_best_on_evaluate \
+            python3 run_speech_grader.py --do_train --save_best_on_evaluate --save_best_on_train \
                                          --do_lower_case \
                                          --model bert \
                                          --model_path bert-base-uncased \
@@ -73,7 +89,7 @@ if [ $stage -le 1 ] && [ $stop_stage -ge 1 ]; then
                                          --output_dir $output_dir \
                                          --score_name $sn \
                                          --data_dir $data_dir/$fd \
-                                         --runs_root $runs_root/$model_type/$sn/$fd \
+                                         --runs_root $runs_root \
                                          --exp_root $exp_root
         done
     done
@@ -87,8 +103,8 @@ if [ $stage -le 2 ] && [ $stop_stage -ge 2 ]; then
         for fd in $folds; do
             output_dir=$model_type/${sn}/${fd}
             model_args_dir=$model_type/${sn}/${fd}
-            model_dir=$model_args_dir/final
-            predictions_file="$runs_root/$model_type/${sn}/${fd}/predictions.txt"
+            model_dir=$model_args_dir/best_train
+            predictions_file="$runs_root/$output_dir/predictions.txt"
             
             python3 run_speech_grader.py --do_test --model bert \
                                          --do_lower_case \
@@ -100,7 +116,7 @@ if [ $stage -le 2 ] && [ $stop_stage -ge 2 ]; then
                                          --predictions_file $predictions_file \
                                          --data_dir $data_dir/$fd \
                                          --score_name $sn \
-                                         --runs_root $runs_root/$model_type/$sn/$fd \
+                                         --runs_root $runs_root \
                                          --output_dir $output_dir \
                                          --exp_root $exp_root
         done
@@ -111,5 +127,5 @@ if [ $stage -le 3 ] && [ $stop_stage -ge 3 ]; then
     python local/speaking_predictions_to_report.py  --data_dir $data_dir \
                                                     --result_root $runs_root/$model_type \
                                                     --folds "$folds" \
-                                                    --scores "$score_names"
+                                                    --scores "$score_names" > $runs_root/$model_type/report.log
 fi
