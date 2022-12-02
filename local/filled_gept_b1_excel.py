@@ -33,6 +33,10 @@ parser.add_argument("--anno_fn",
                     default="111年口說語料.xlsx",
                     type=str)
 
+parser.add_argument("--new_anno_fn",
+                    default="new_111年口說語料.xlsx",
+                    type=str)
+
 
 args = parser.parse_args()
 
@@ -41,7 +45,7 @@ recog_path = args.recog_path
 text_path = args.text_path
 anno_path = os.path.join(corpus_dir, args.anno_fn)
 scores = args.scores.split()
-new_anno_path = os.path.join(corpus_dir, "new_" + args.anno_fn)
+new_anno_path = os.path.join(corpus_dir, args.new_anno_fn)
 
 text_dict = {}
 recog_dict = {}
@@ -102,7 +106,9 @@ for i in tqdm(range(len(anno_df_2nd))):
     text, recog_text = text_dict[spkid]["2"], recog_dict[spkid]["2"]
     
     for score in scores:
-        anno_df_2nd.at[i, score] = np.round(anno_df_2nd[score][i])
+        # 四捨五入，因為只有兩個人評分，因此有小數點只會是.5
+        # anno_df_2nd.at[i, score] = np.ceil(anno_df_2nd[score][i])
+        anno_df_2nd.at[i, score] = anno_df_2nd[score][i]
     
     anno_df_2nd.at[i,"trans_human"] = " | ".join(text)
     anno_df_2nd.at[i, "trans_stt"] = " | ".join(recog_text)
@@ -115,7 +121,9 @@ for i in tqdm(range(len(anno_df_3rd))):
     text, recog_text = text_dict[spkid]["3"][0], recog_dict[spkid]["3"][0]
     
     for score in scores:
-        anno_df_3rd.at[i, score] = np.round(anno_df_3rd[score][i])
+        # 四捨五入，因為只有兩個人評分，因此有小數點只會是.5
+        #anno_df_3rd.at[i, score] = np.ceil(anno_df_3rd[score][i])
+        anno_df_3rd.at[i, score] = anno_df_3rd[score][i]
     
     anno_df_3rd.at[i, "trans_human"] = text
     anno_df_3rd.at[i, "trans_stt"] = recog_text

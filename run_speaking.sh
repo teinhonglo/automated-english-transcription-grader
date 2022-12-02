@@ -18,7 +18,7 @@ part=3
 test_on_valid="true"
 merge_below_b1="false"
 trans_type="trans_stt"
-n_resample="false"
+do_round="false"
 extra_options=
 
 . ./path.sh
@@ -36,19 +36,19 @@ if [ "$test_on_valid" == "true" ]; then
     runs_root=${runs_root}_tov
 fi
 
+if [ "$do_round" == "true" ]; then
+    extra_options="$extra_options --do_round"
+    data_dir=${data_dir}_round
+    exp_root=${exp_root}_round
+    runs_root=${runs_root}_round
+fi
+
 if [ "$merge_below_b1" == "true" ]; then
     extra_options="$extra_options --merge_below_b1"
     data_dir=${data_dir}_bb1
     exp_root=${exp_root}_bb1
     runs_root=${runs_root}_bb1
 fi
-
-#if [ "$n_resample" != "e" ]; then
-#    extra_options="$extra_options --do_resample"
-#    data_dir=${data_dir}_rs
-#    exp_root=${exp_root}_rs
-#    runs_root=${runs_root}_rs
-#fi
 
 set -euo pipefail
 

@@ -63,7 +63,10 @@ def filled_csv(csv_dict, result_root, score, nf, text_ids):
    
     kfold_dir = os.path.join(result_root, score, nf) 
     pred_path = os.path.join(kfold_dir, "predictions.txt")
-        
+    
+    if not os.path.exists(pred_path):
+        return False
+    
     with open(pred_path, "r") as fn:
         for i, line in enumerate(fn.readlines()):
             text_id = text_ids[nf][i]
@@ -74,7 +77,7 @@ def filled_csv(csv_dict, result_root, score, nf, text_ids):
             #print(score, i, nf, int(csv_dict[nf][text_id]["anno"][score]), int(anno_score)) 
             assert int(csv_dict[nf][text_id]["anno"][score]) == int(anno_score)
             csv_dict[nf][text_id]["pred"][score] = pred_score
-    return
+    return True
 
 
 def evaluation(total_losses_score_nf, evaluate_dict, target_score="organization", np_bins=None):
@@ -105,9 +108,9 @@ def evaluation(total_losses_score_nf, evaluate_dict, target_score="organization"
 data_dir = args.data_dir
 n_folds = args.folds.split()
 result_root = args.result_root
-scores = args.scores
+scores = args.scores.split()
 
-csv_header = "text_id " + scores
+csv_header = "text_id " + " ".join(scores)
 csv_header = csv_header.split()
 csv_dict = {}
 text_ids = {}
@@ -143,18 +146,23 @@ total_losses = defaultdict(dict)
 total_df_losses = defaultdict(dict)
 average_losses = defaultdict(dict)
 infos = ["anno", "anno(cefr)", "pred", "pred(cefr)"]
+
+scores_ = []
+for nf in n_folds:
+    for score in scores:
+        sucessful = filled_csv(csv_dict, result_root, score, nf, text_ids)
+        if sucessful:
+            scores_.append(score)
+             
+scores = list(scores_)
 kfold_info = {}
 
-for score in scores.split():
+for score in scores:
     kfold_info[score] = {str(1+i):{info:[] for info in infos} for i in range(len(n_folds))}
     kfold_info[score]["All"] = {info:[] for info in infos}
 
-for nf in n_folds:
-    for score in scores.split():
-        filled_csv(csv_dict, result_root, score, nf, text_ids)
-
 print("ORIGIN")
-for score in scores.split():
+for score in scores:
     
     for nf in n_folds: 
         total_losses[score][nf] = {}
@@ -185,7 +193,7 @@ print()
 print("CEFR")
 cefr_bins = np.array([2.5, 4.5, 6.5])
 
-for score in scores.split():
+for score in scores:
     
     for nf in n_folds: 
         total_losses[score][nf] = {}

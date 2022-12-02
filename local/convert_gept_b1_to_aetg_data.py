@@ -4,6 +4,7 @@ import logging
 import os
 import csv
 from sklearn.model_selection import train_test_split
+import numpy as np
 from tqdm import tqdm
 import pandas as pd
 
@@ -47,6 +48,9 @@ parser.add_argument("--test_on_valid",
 parser.add_argument("--merge_below_b1",
                     action="store_true")
 
+parser.add_argument("--do_round",
+                    action="store_true")
+
 args = parser.parse_args()
 
 corpus_dir = args.corpus_dir
@@ -79,6 +83,10 @@ for i, text_id in tqdm(enumerate(anno_df[id_column])):
         if args.merge_below_b1:
             if anno_score <= 4:
                 anno_score = 4
+        
+        # 因為只有兩人，因此有小數點時只有.5，取ceil即為四捨五入     
+        if args.do_round:
+            anno_score = np.ceil(anno_score)
             
         tsv_dict[score].append(anno_score)
     
