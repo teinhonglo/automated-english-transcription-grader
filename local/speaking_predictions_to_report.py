@@ -74,8 +74,7 @@ def filled_csv(csv_dict, result_root, score, nf, text_ids):
             pred_score = float(pred_score.split()[0])
             anno_score = float(anno_score.split()[0])
             
-            #print(score, i, nf, int(csv_dict[nf][text_id]["anno"][score]), int(anno_score)) 
-            #assert int(csv_dict[nf][text_id]["anno"][score]) == int(anno_score)
+            assert csv_dict[nf][text_id]["anno"][score] == anno_score
             csv_dict[nf][text_id]["pred"][score] = pred_score
     return True
 
@@ -127,6 +126,7 @@ for nf in n_folds:
             if i == 0: continue 
             text_id, text = row[:2]
             content, pronunciation, vocabulary = row[2:]
+            content, pronunciation, vocabulary = float(content), float(pronunciation), float(vocabulary)
             
             text_ids[nf].append(text_id)
             csv_dict[nf][text_id]["anno"] = {
