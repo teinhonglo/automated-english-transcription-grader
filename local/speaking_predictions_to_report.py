@@ -75,7 +75,7 @@ def filled_csv(csv_dict, result_root, score, nf, text_ids):
             anno_score = float(anno_score.split()[0])
             
             #print(score, i, nf, int(csv_dict[nf][text_id]["anno"][score]), int(anno_score)) 
-            assert int(csv_dict[nf][text_id]["anno"][score]) == int(anno_score)
+            #assert int(csv_dict[nf][text_id]["anno"][score]) == int(anno_score)
             csv_dict[nf][text_id]["pred"][score] = pred_score
     return True
 
@@ -152,7 +152,8 @@ for nf in n_folds:
     for score in scores:
         sucessful = filled_csv(csv_dict, result_root, score, nf, text_ids)
         if sucessful:
-            scores_.append(score)
+            if score not in scores_:
+                scores_.append(score)
              
 scores = list(scores_)
 kfold_info = {}
@@ -162,18 +163,18 @@ for score in scores:
     kfold_info[score]["All"] = {info:[] for info in infos}
 
 print("ORIGIN")
+print("scores", scores)
 for score in scores:
     
     for nf in n_folds: 
         total_losses[score][nf] = {}
         total_losses[score][nf], all_score_preds, all_score_annos = evaluation(total_losses[score][nf], csv_dict[nf], score)
         kfold_dir = os.path.join(result_root, score, nf) 
-        fig_path = os.path.join(kfold_dir, "origin.png")
-        plot_scatter(all_score_preds, all_score_annos, title="Scatter of predctions and annotations" + str(nf), fig_path=fig_path)
         kfold_info[score][nf]["anno"] += all_score_annos.tolist()
         kfold_info[score][nf]["pred"] += all_score_preds.tolist() 
         kfold_info[score]["All"]["anno"] += all_score_annos.tolist()
         kfold_info[score]["All"]["pred"] += all_score_preds.tolist()
+        #print(nf, len(kfold_info[score][nf]["pred"]))
         #fig = csv_dict[nf].plot.scatter(figsize=(20, 16), fontsize=26).get_figure()
         
     ave_losses = {k:0 for k in list(total_losses[score][n_folds[0]]["origin"].keys())}
@@ -199,18 +200,16 @@ for score in scores:
         total_losses[score][nf] = {}
         total_losses[score][nf], all_score_preds, all_score_annos = evaluation(total_losses[score][nf], csv_dict[nf], score, cefr_bins)
         kfold_dir = os.path.join(result_root, score, nf) 
-        fig_path = os.path.join(kfold_dir, "cefr.png")
-        plot_scatter(all_score_preds, all_score_annos, title="Scatter of predctions and annotations" + str(nf), fig_path=fig_path)
-        
         kfold_info[score][nf]["anno(cefr)"] += all_score_annos.tolist()
         kfold_info[score][nf]["pred(cefr)"] += all_score_preds.tolist() 
         kfold_info[score]["All"]["anno(cefr)"] += all_score_annos.tolist()
         kfold_info[score]["All"]["pred(cefr)"] += all_score_preds.tolist()
+        assert len(all_score_annos) == len(all_score_preds) 
         
     result_dir = os.path.join(result_root, score)
     with pd.ExcelWriter(os.path.join(result_dir, "kfold_detail.xlsx")) as writer:
         for f in list(kfold_info[score].keys()):
-            df = pd.DataFrame(kfold_info[score][f])
+            df = pd.DataFrame.from_dict(kfold_info[score][f])
             df.to_excel(writer, sheet_name=f)   
     
     ave_losses = {k:0 for k in list(total_losses[score][n_folds[0]]["origin"].keys())}
