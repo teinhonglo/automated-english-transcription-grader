@@ -86,9 +86,9 @@ def evaluation(total_losses_score_nf, evaluate_dict, target_score="organization"
 data_dir = args.data_dir
 n_folds = args.folds.split()
 result_root = args.result_root
-scores = args.scores
+scores = args.scores.split()
 
-csv_header = "text_id " + scores
+csv_header = "text_id " + " ".join(scores)
 csv_header = csv_header.split()
 csv_dict = {}
 text_ids = {}
@@ -128,20 +128,21 @@ average_losses = defaultdict(dict)
 infos = ["anno", "anno(cefr)", "pred", "pred(cefr)"]
 kfold_info = {}
 
-for score in scores.split():
+for score in scores:
     kfold_info[score] = {str(1+i):{info:[] for info in infos} for i in range(len(n_folds))}
     kfold_info[score]["All"] = {info:[] for info in infos}
 
 for nf in n_folds:
-    for score in scores.split():
+    for score in scores:
         filled_csv(csv_dict, result_root, score, nf, text_ids)
 
 print("ORIGIN")
-for score in scores.split():
-    
+
+all_bins = np.array([1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5])
+for score in scores:
     for nf in n_folds: 
         total_losses[score][nf] = {}
-        total_losses[score][nf], all_score_preds, all_score_annos = evaluation(total_losses[score][nf], csv_dict[nf], score)
+        total_losses[score][nf], all_score_preds, all_score_annos = evaluation(total_losses[score][nf], csv_dict[nf], score, all_bins)
         kfold_dir = os.path.join(result_root, score, nf) 
         kfold_info[score][nf]["anno"] += all_score_annos.tolist()
         kfold_info[score][nf]["pred"] += all_score_preds.tolist() 
@@ -166,7 +167,7 @@ print()
 print("CEFR")
 cefr_bins = np.array([2.5, 4.5, 6.5])
 
-for score in scores.split():
+for score in scores:
     
     for nf in n_folds: 
         total_losses[score][nf] = {}

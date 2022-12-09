@@ -41,26 +41,8 @@ parser.add_argument("--scores",
 args = parser.parse_args()
 
 
-def plot_scatter(predictions, annotations, title="Scatter of predctions and annotations", fig_path="origin.png"):
-    plt.figure(figsize=(7,5))   # 顯示圖框架大小
-    plt.style.use("ggplot")     # 使用ggplot主題樣式
-    plt.xlabel("Predictions", fontweight = "bold")                  #設定x座標標題及粗體
-    plt.ylabel("Annotations", fontweight = "bold")   #設定y座標標題及粗體
-    plt.title(title,
-          fontsize = 15, fontweight = "bold")        #設定標題、字大小及粗體
-
-    plt.scatter(predictions,                    # x軸資料
-            annotations,     # y軸資料
-            c = "m",                                  # 點顏色
-            s = 50,                                   # 點大小
-            alpha = .5,                               # 透明度
-            marker = "D")                             # 點樣式
-
-    plt.savefig(fig_path)   #儲存圖檔
-    plt.close()      # 關閉圖表
-
 def filled_csv(csv_dict, result_root, score, nf, text_ids):
-   
+     
     kfold_dir = os.path.join(result_root, score, nf) 
     pred_path = os.path.join(kfold_dir, "predictions.txt")
     
@@ -164,11 +146,12 @@ for score in scores:
 
 print("ORIGIN")
 print("scores", scores)
-for score in scores:
-    
+
+all_bins = np.array([1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5])
+for score in scores: 
     for nf in n_folds: 
         total_losses[score][nf] = {}
-        total_losses[score][nf], all_score_preds, all_score_annos = evaluation(total_losses[score][nf], csv_dict[nf], score)
+        total_losses[score][nf], all_score_preds, all_score_annos = evaluation(total_losses[score][nf], csv_dict[nf], score, all_bins)
         kfold_dir = os.path.join(result_root, score, nf) 
         kfold_info[score][nf]["anno"] += all_score_annos.tolist()
         kfold_info[score][nf]["pred"] += all_score_preds.tolist() 
@@ -200,16 +183,16 @@ for score in scores:
         total_losses[score][nf] = {}
         total_losses[score][nf], all_score_preds, all_score_annos = evaluation(total_losses[score][nf], csv_dict[nf], score, cefr_bins)
         kfold_dir = os.path.join(result_root, score, nf) 
+        
         kfold_info[score][nf]["anno(cefr)"] += all_score_annos.tolist()
         kfold_info[score][nf]["pred(cefr)"] += all_score_preds.tolist() 
         kfold_info[score]["All"]["anno(cefr)"] += all_score_annos.tolist()
         kfold_info[score]["All"]["pred(cefr)"] += all_score_preds.tolist()
-        assert len(all_score_annos) == len(all_score_preds) 
         
     result_dir = os.path.join(result_root, score)
     with pd.ExcelWriter(os.path.join(result_dir, "kfold_detail.xlsx")) as writer:
         for f in list(kfold_info[score].keys()):
-            df = pd.DataFrame.from_dict(kfold_info[score][f])
+            df = pd.DataFrame(kfold_info[score][f])
             df.to_excel(writer, sheet_name=f)   
     
     ave_losses = {k:0 for k in list(total_losses[score][n_folds[0]]["origin"].keys())}
@@ -224,4 +207,3 @@ for score in scores:
     print(score, ave_losses)
     df_losses = pd.DataFrame.from_dict(df_losses)
     print(df_losses.mean())
-
