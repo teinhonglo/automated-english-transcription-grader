@@ -237,7 +237,7 @@ class Trainer:
                         self._save_model('best')
                     
 
-                tb_writer.add_scalar('lr', scheduler.get_lr()[0], self.global_step)
+                tb_writer.add_scalar('lr', scheduler.get_last_lr()[0], self.global_step)
                 tb_writer.add_scalar('train_loss', train_loss, self.global_step)
                 for key, value in losses.items():
                     tb_writer.add_scalar('train_{}'.format(key), value, self.global_step)

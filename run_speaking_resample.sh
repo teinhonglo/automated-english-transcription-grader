@@ -13,6 +13,7 @@ test_on_valid="true"
 merge_below_b1="false"
 trans_type="trans_stt"
 do_round="true"
+n_resamples=100
 # model-related
 model=bert
 model_type=bert-model
@@ -25,7 +26,6 @@ extra_options=
 . ./path.sh
 . ./parse_options.sh
 
-set -euo pipefail
 
 data_dir=data-speaking/gept-p${part}/$trans_type
 exp_root=exp-speaking/gept-p${part}/$trans_type
@@ -52,8 +52,9 @@ if [ "$merge_below_b1" == "true" ]; then
     runs_root=${runs_root}_bb1
 fi
 
+set -euo pipefail
 
-if [ $stage -le 0 ] && [ $stop_stage -ge 0 ]; then  
+if [ $stage -le -1 ] && [ $stop_stage -ge -1 ]; then  
     if [ -d $data_dir ]; then
         echo "[NOTICE] $data_dir is already existed."
         echo "Skip data preparation."
@@ -71,12 +72,43 @@ if [ $stage -le 0 ] && [ $stop_stage -ge 0 ]; then
     fi
 fi
 
+if [ $stage -le 0 ] && [ $stop_stage -ge 0 ]; then
+    for sn in $score_names; do
+        new_data_dir=${data_dir}_r${n_resamples}_${sn}
+        new_exp_root=${exp_root}_r${n_resamples}_${sn}
+        new_runs_root=${runs_root}_r${n_resamples}_${sn}
+        
+        echo $new_data_dir
+        if [ ! -d $new_data_dir ]; then
+            mkdir -p $new_data_dir;
+            rsync -a --exclude=*cached* $data_dir/ $new_data_dir/
+            for fd in $folds; do
+                python local/do_resample.py --data_dir $new_data_dir/$fd \
+                                        --score $sn \
+                                        --n_resamples $n_resamples
+            done
+        else
+            echo "$new_data_dir is already existed"
+        fi
+    done
+fi
+
 if [ $stage -le 1 ] && [ $stop_stage -ge 1 ]; then  
      
     for sn in $score_names; do
         for fd in $folds; do
             # model_args_dir
+            new_data_dir=${data_dir}_r${n_resamples}_${sn}
+            new_exp_root=${exp_root}_r${n_resamples}_${sn}
+            new_runs_root=${runs_root}_r${n_resamples}_${sn}
             output_dir=$model_type/${sn}/${fd}
+            model_args_dir=$model_type/${sn}/${fd}
+           
+            if [ -d $new_exp_root/$model_args_dir/final ]; then
+                echo "$new_exp_root/$model_args_dir/final is already existed."
+                continue
+            fi
+            
             python3 run_speech_grader.py --do_train --save_best_on_evaluate --save_best_on_train \
                                          --do_lower_case \
                                          --model $model \
@@ -88,9 +120,9 @@ if [ $stage -le 1 ] && [ $stop_stage -ge 1 ]; then
                                          --max_score $max_score --evaluate_during_training \
                                          --output_dir $output_dir \
                                          --score_name $sn \
-                                         --data_dir $data_dir/$fd \
-                                         --runs_root $runs_root \
-                                         --exp_root $exp_root
+                                         --data_dir $new_data_dir/$fd \
+                                         --runs_root $new_runs_root \
+                                         --exp_root $new_exp_root
         done
     done
 fi
@@ -101,10 +133,14 @@ if [ $stage -le 2 ] && [ $stop_stage -ge 2 ]; then
     
     for sn in $score_names; do
         for fd in $folds; do
+            new_data_dir=${data_dir}_r${n_resamples}_${sn}
+            new_exp_root=${exp_root}_r${n_resamples}_${sn}
+            new_runs_root=${runs_root}_r${n_resamples}_${sn}
+            
             output_dir=$model_type/${sn}/${fd}
             model_args_dir=$model_type/${sn}/${fd}
             model_dir=$model_args_dir/best_train
-            predictions_file="$runs_root/$output_dir/predictions.txt"
+            predictions_file="$new_runs_root/$output_dir/predictions.txt"
             
             python3 run_speech_grader.py --do_test --model $model \
                                          --do_lower_case \
@@ -114,20 +150,24 @@ if [ $stage -le 2 ] && [ $stop_stage -ge 2 ]; then
                                          --max_score $max_score \
                                          --model_dir $model_dir \
                                          --predictions_file $predictions_file \
-                                         --data_dir $data_dir/$fd \
+                                         --data_dir $new_data_dir/$fd \
                                          --score_name $sn \
-                                         --runs_root $runs_root \
+                                         --runs_root $new_runs_root \
                                          --output_dir $output_dir \
-                                         --exp_root $exp_root
+                                         --exp_root $new_exp_root
         done
     done 
 fi
 
 if [ $stage -le 3 ] && [ $stop_stage -ge 3 ]; then  
-    python local/speaking_predictions_to_report.py  --data_dir $data_dir \
-                                                    --result_root $runs_root/$model_type \
-                                                    --folds "$folds" \
-                                                    --scores "$score_names" > $runs_root/$model_type/report.log
+    for sn in $score_names; do
+        new_data_dir=${data_dir}_r${n_resamples}_${sn}
+        new_runs_root=${runs_root}_r${n_resamples}_${sn}
+        python local/speaking_predictions_to_report.py  --data_dir $new_data_dir \
+                                                        --result_root $new_runs_root/$model_type \
+                                                        --folds "$folds" \
+                                                        --scores "$score_names" > $new_runs_root/$model_type/report.log
+    done
 fi
 
 if [ $stage -le 4 ] && [ $stop_stage -ge 4 ]; then  
