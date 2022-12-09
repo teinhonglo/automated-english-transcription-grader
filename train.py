@@ -124,7 +124,7 @@ class Trainer:
             if verbose or self.args.predictions_file:
                 all_score_predictions[start:end] = predictions['score'].detach()
                 all_score_targets[start:end] = labels['score'].detach()
-            for objective, loss in get_losses(self.training_objectives, predictions, labels, self.args.device).items():
+            for objective, loss in get_losses(self.training_objectives, predictions, labels, self.args.device, self.args.score_loss).items():
                 if total_losses.get(objective, None):
                     total_losses[objective] += loss.item()
                 else:
@@ -201,7 +201,7 @@ class Trainer:
         self.grader.train()
         inputs, labels = self._get_inputs_and_labels(batch)
         training_objective_predictions = self.grader(inputs)
-        losses = get_losses(self.training_objectives, training_objective_predictions, labels, self.args.device)
+        losses = get_losses(self.training_objectives, training_objective_predictions, labels, self.args.device, self.args.score_loss)
         loss = losses['overall']
         if self.args.gradient_accumulation_steps > 1:
             loss = loss / self.args.gradient_accumulation_steps

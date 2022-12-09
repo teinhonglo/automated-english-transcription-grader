@@ -20,6 +20,7 @@ model_path=bert-base-uncased
 max_score=8
 max_seq_length=512
 num_epochs=6
+score_loss=mse
 extra_options=
 
 . ./path.sh
@@ -88,6 +89,7 @@ if [ $stage -le 1 ] && [ $stop_stage -ge 1 ]; then
                                          --max_score $max_score --evaluate_during_training \
                                          --output_dir $output_dir \
                                          --score_name $sn \
+                                         --score_loss $score_loss \
                                          --data_dir $data_dir/$fd \
                                          --runs_root $runs_root \
                                          --exp_root $exp_root
@@ -116,6 +118,7 @@ if [ $stage -le 2 ] && [ $stop_stage -ge 2 ]; then
                                          --predictions_file $predictions_file \
                                          --data_dir $data_dir/$fd \
                                          --score_name $sn \
+                                         --score_loss $score_loss \
                                          --runs_root $runs_root \
                                          --output_dir $output_dir \
                                          --exp_root $exp_root

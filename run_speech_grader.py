@@ -4,10 +4,11 @@ import os
 
 import torch
 from transformers import BertTokenizer, BertConfig
+from transformers import AutoTokenizer, AutoConfig
 
 import data
 import train
-from models import bert_model, lstm_model
+from models import bert_model, auto_model, lstm_model
 
 logger = logging.getLogger(__name__)
 # The auxiliary objectives used to train the speech grader.
@@ -108,6 +109,7 @@ def main():
     parser.add_argument('--seed', type=int, default=42,
                         help="random seed for initialization")
     parser.add_argument('--predictions_file', type=str, default=None)
+    parser.add_argument('--score_loss', type=str, default="mse")
     parser.add_argument('--score_name', type=str, default="grammar")
     parser.add_argument('--runs_root', type=str, default="runs")
     parser.add_argument('--exp_root', type=str, default="exp")
@@ -171,6 +173,20 @@ def main():
                 args.model, args.data_dir, args.max_seq_length, args.special_tokens,
                 logger, args.score_name, tokenizer=tokenizer, evaluate=True, reload=args.overwrite_cache)
             trainer = train.Trainer(args, grader, training_objectives, bert_tokenizer=tokenizer)
+        elif args.model == 'auto':
+            tokenizer = AutoTokenizer.from_pretrained(args.model_path, additional_special_tokens=args.special_tokens, use_fast=False, do_lower_case=args.do_lower_case)
+            config = AutoConfig.from_pretrained(args.model_path)
+            training_objectives = get_auxiliary_objectives(args, tokenizer.vocab_size)
+            config.training_objectives = training_objectives
+            config.max_score = args.max_score
+            grader = audo_model.SpeechGraderModel(config=config).to(args.device)
+            train_data = data.load_and_cache_examples(
+                args.model, args.data_dir, args.max_seq_length, args.special_tokens,
+                logger, args.score_name, tokenizer=tokenizer, reload=args.overwrite_cache)
+            dev_data = data.load_and_cache_examples(
+                args.model, args.data_dir, args.max_seq_length, args.special_tokens,
+                logger, args.score_name, tokenizer=tokenizer, evaluate=True, reload=args.overwrite_cache)
+            trainer = train.Trainer(args, grader, training_objectives, bert_tokenizer=tokenizer)
         else:
             args.logger.info("--model must be either 'lstm' or 'bert'")
             return
@@ -196,7 +212,7 @@ def main():
                 logger, args.score_name, vocab=vocab, test=True, reload=args.overwrite_cache)
             trainer = train.Trainer(train_args, grader, training_objectives)
 
-        else:
+        elif train_args.model == "bert":
             tokenizer = BertTokenizer.from_pretrained(os.path.join(args.exp_root, args.model_dir), do_lower_case=args.do_lower_case)
             training_objectives = get_auxiliary_objectives(train_args, tokenizer.vocab_size)
             config = BertConfig.from_pretrained(os.path.join(args.exp_root, args.model_dir))
@@ -205,6 +221,16 @@ def main():
                 train_args.model, args.data_dir, train_args.max_seq_length, train_args.special_tokens,
                 logger, args.score_name, tokenizer=tokenizer, test=True, reload=args.overwrite_cache)
             trainer = train.Trainer(train_args, grader, training_objectives, bert_tokenizer=tokenizer)
+        elif train_args.model == "auto":
+            tokenizer = AutoTokenizer.from_pretrained(os.path.join(args.exp_root, args.model_dir), do_lower_case=args.do_lower_case)
+            training_objectives = get_auxiliary_objectives(train_args, tokenizer.vocab_size)
+            config = AutoConfig.from_pretrained(os.path.join(args.exp_root, args.model_dir))
+            grader = auto_model.SpeechGraderModel.from_pretrained(os.path.join(args.exp_root, args.model_dir), config=config).to(args.device)
+            test_data = data.load_and_cache_examples(
+                train_args.model, args.data_dir, train_args.max_seq_length, train_args.special_tokens,
+                logger, args.score_name, tokenizer=tokenizer, test=True, reload=args.overwrite_cache)
+            trainer = train.Trainer(train_args, grader, training_objectives, bert_tokenizer=tokenizer)
+        
         trainer.test(test_data)
 
 if __name__ == "__main__":

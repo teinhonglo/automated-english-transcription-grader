@@ -21,6 +21,7 @@ model_path=bert-base-uncased
 max_score=8
 max_seq_length=512
 num_epochs=6
+score_loss=mse
 extra_options=
 
 . ./path.sh
@@ -120,6 +121,7 @@ if [ $stage -le 1 ] && [ $stop_stage -ge 1 ]; then
                                          --max_score $max_score --evaluate_during_training \
                                          --output_dir $output_dir \
                                          --score_name $sn \
+                                         --score_loss $score_loss \
                                          --data_dir $new_data_dir/$fd \
                                          --runs_root $new_runs_root \
                                          --exp_root $new_exp_root
@@ -152,6 +154,7 @@ if [ $stage -le 2 ] && [ $stop_stage -ge 2 ]; then
                                          --predictions_file $predictions_file \
                                          --data_dir $new_data_dir/$fd \
                                          --score_name $sn \
+                                         --score_loss $score_loss \
                                          --runs_root $new_runs_root \
                                          --output_dir $output_dir \
                                          --exp_root $new_exp_root
@@ -172,6 +175,11 @@ fi
 
 if [ $stage -le 4 ] && [ $stop_stage -ge 4 ]; then  
     echo $runs_root/$model_type
-    python local/visualization.py   --result_root $runs_root/$model_type \
-                                    --scores "$score_names"
+    for sn in $score_names; do
+        new_data_dir=${data_dir}_r${n_resamples}_${sn}
+        new_runs_root=${runs_root}_r${n_resamples}_${sn}
+
+        python local/visualization.py   --result_root $new_runs_root/$model_type \
+                                        --scores "$sn"
+    done
 fi
