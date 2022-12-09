@@ -78,8 +78,8 @@ def evaluation(total_losses_score_nf, evaluate_dict, target_score="organization"
     all_score_annos = np.array(all_score_annos)
     
     if np_bins is not None:
-        all_score_preds = np.digitize(all_score_preds, np_bins)
-        all_score_annos = np.digitize(all_score_annos, np_bins)
+        all_score_preds = np.digitize(all_score_preds, np_bins) + 1
+        all_score_annos = np.digitize(all_score_annos, np_bins) + 1
     
     compute_metrics(total_losses_score_nf["origin"], all_score_preds, all_score_annos)
      
