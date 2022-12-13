@@ -179,7 +179,7 @@ def main():
             training_objectives = get_auxiliary_objectives(args, tokenizer.vocab_size)
             config.training_objectives = training_objectives
             config.max_score = args.max_score
-            grader = audo_model.SpeechGraderModel(config=config).to(args.device)
+            grader = auto_model.SpeechGraderModel(config=config).to(args.device)
             train_data = data.load_and_cache_examples(
                 args.model, args.data_dir, args.max_seq_length, args.special_tokens,
                 logger, args.score_name, tokenizer=tokenizer, reload=args.overwrite_cache)
