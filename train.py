@@ -121,6 +121,7 @@ class Trainer:
             self.grader.eval()
             inputs, labels = self._get_inputs_and_labels(batch, eval=True)
             predictions = self.grader(inputs)
+             
             if verbose or self.args.predictions_file:
                 all_score_predictions[start:end] = predictions['score'].detach()
                 all_score_targets[start:end] = labels['score'].detach()
@@ -145,8 +146,6 @@ class Trainer:
         self.args.logger.info("***** Eval results {} *****".format(prefix))
         for key in sorted(total_losses.keys()):
             self.args.logger.info("  %s = %s", key, str(total_losses[key]))
-            #print(all_score_targets)
-            #print(all_score_predictions)
         if verbose and writer:
             header_row = 'Predicted score | Actual score\n---|---\n'
             table_rows = ['{} | {}'.format(pred, target) for pred, target in
@@ -159,7 +158,7 @@ class Trainer:
     def _get_inputs_and_labels(self, batch, eval=False):
         """Prepares the input and labels for a batch."""
         batch = tuple(t.to(self.args.device) for t in batch)
-        if self.args.model == 'bert':
+        if self.args.model in ['bert', 'auto']:
             # Tokens should only be masked during training.
             if not eval and 'mlm' in self.training_objectives:
                 input_ids, mlm_mask = mask_tokens(self.bert_tokenizer, batch[0], self.args.device)
@@ -201,6 +200,7 @@ class Trainer:
         self.grader.train()
         inputs, labels = self._get_inputs_and_labels(batch)
         training_objective_predictions = self.grader(inputs)
+         
         losses = get_losses(self.training_objectives, training_objective_predictions, labels, self.args.device, self.args.score_loss)
         loss = losses['overall']
         if self.args.gradient_accumulation_steps > 1:
@@ -249,7 +249,7 @@ class Trainer:
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
 
-        if self.args.model == 'bert':
+        if self.args.model in ['bert', 'auto']:
             self.grader.save_pretrained(output_dir)
             self.bert_tokenizer.save_pretrained(output_dir)
         else:

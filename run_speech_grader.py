@@ -188,7 +188,7 @@ def main():
                 logger, args.score_name, tokenizer=tokenizer, evaluate=True, reload=args.overwrite_cache)
             trainer = train.Trainer(args, grader, training_objectives, bert_tokenizer=tokenizer)
         else:
-            args.logger.info("--model must be either 'lstm' or 'bert'")
+            args.logger.info("--model must be either 'lstm' or 'bert' or 'auto'")
             return
         trainer.train(train_data, dev_data)
 

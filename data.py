@@ -112,7 +112,7 @@ class TSVProcessor(object):
 
 def convert_examples_to_features(examples, model, max_seq_length, special_tokens, logger,
                                  vocab=None, tokenizer=None):
-    special_tokens_count = 2 if model == 'bert' else 0
+    special_tokens_count = 2 if model in ['bert', 'auto'] else 0
     pos_tag_label_map = {label: i for i, label in enumerate(pos_tag_labels)}
     dep_rel_label_map = {label: i for i, label in enumerate(deprel_labels)}
     native_language_label_map = {label: i for i, label in enumerate(native_language_labels)}
@@ -129,7 +129,7 @@ def convert_examples_to_features(examples, model, max_seq_length, special_tokens
                 break
             word_pieces = tokenizer.tokenize(word) if tokenizer else [word]
             tokens.extend(word_pieces)
-            # don't predict on special tokens for auxiliary objjectives
+            # don't predict on special tokens for auxiliary objectives
             if word in special_tokens:
                 pos_tags.append(-1)
                 dep_rels.append(-1)
@@ -138,7 +138,7 @@ def convert_examples_to_features(examples, model, max_seq_length, special_tokens
                 pos_tags.append(pos_tag_label_map.get(example.pos_tags[i], 0))
                 dep_rels.append(dep_rel_label_map.get(example.dep_rels[i], 0))
                 native_language.append(native_language_label_map.get(example.native_language, 0))
-                if model == 'bert':
+                if model in ['bert', 'auto']:
                     token_padding = [-1] * (len(word_pieces) - 1)
                     pos_tags.extend(token_padding)
                     dep_rels.extend(token_padding)
@@ -154,7 +154,7 @@ def convert_examples_to_features(examples, model, max_seq_length, special_tokens
 
         if model == 'lstm':
             input_ids = [vocab.get(token, 1) for token in tokens]
-        else:
+        elif model in ['bert', 'auto']:
             input_ids = tokenizer.convert_tokens_to_ids([tokenizer.cls_token] + tokens + [tokenizer.sep_token])
             pos_tags = [-1] + pos_tags + [-1]
             dep_rels = [-1] + dep_rels + [-1]
@@ -167,12 +167,13 @@ def convert_examples_to_features(examples, model, max_seq_length, special_tokens
         input_mask = [1] * len(input_ids)
         # Zero-pad up to the sequence length.
         example_padding = max_seq_length - len(input_ids)
-        input_ids = input_ids + ([tokenizer.pad_token_id if model == 'bert' else 0] * example_padding)
+        input_ids = input_ids + ([tokenizer.pad_token_id if model in ['bert', 'auto'] else 0] * example_padding)
         input_mask = input_mask + ([0] * example_padding)
         pos_tags = pos_tags + ([-1] * example_padding)
         dep_rels = dep_rels + ([-1] * example_padding)
         native_language = native_language + ([-1] * example_padding)
-        if model == 'bert':
+        
+        if model in ['bert', 'auto']:
             segment_ids = segment_ids + ([0] * example_padding)
             assert len(segment_ids) == max_seq_length
 
@@ -192,7 +193,7 @@ def convert_examples_to_features(examples, model, max_seq_length, special_tokens
                     [str(x) for x in tokens]))
             logger.info("input_ids: %s" % " ".join([str(x) for x in input_ids]))
             logger.info("input_mask: %s" % " ".join([str(x) for x in input_mask]))
-            if model == 'bert':
+            if model in ['bert', 'auto']:
                 logger.info("segment_ids: %s" % " ".join([str(x) for x in segment_ids]))
             logger.info("score: %d)" % (score))
 

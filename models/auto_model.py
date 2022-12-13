@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from transformers import AutoModel, AutoTokenizer, AutoConfig
-from transformers.models.bert.modeling_bert import BertPredictionHeadTransform
+from transformers.models.bert.modeling_bert import BertPreTrainedModel, BertPredictionHeadTransform
 
 class PredictionHead(nn.Module):
     '''
@@ -28,7 +28,7 @@ class PredictionHead(nn.Module):
         hidden_states = self.decoder(hidden_states) + self.bias
         return hidden_states
 
-class SpeechGraderModel(nn.Module):
+class SpeechGraderModel(BertPreTrainedModel):
     '''
     BERT Model for automated speech scoring of transcripts.
 
@@ -43,14 +43,14 @@ class SpeechGraderModel(nn.Module):
     def __init__(self, config):
         super(SpeechGraderModel, self).__init__(config)
 
-        self.model_config = config
-        self.model = AutoModel.from_config(config)
-        
+        self.config = config
+        self.bert = AutoModel.from_config(config)
+
         # Creates a prediction head per objective.
         self.decoder_objectives = config.training_objectives.keys()
         for objective, objective_params in config.training_objectives.items():
             num_predictions, _ = objective_params
-            decoder = PredictionHead(self.model_config, num_predictions)
+            decoder = PredictionHead(self.config, num_predictions)
             setattr(self, objective + '_decoder', decoder)
 
         # The score scaler is used to force the result of the score prediction head to be within the range of possible
@@ -63,11 +63,11 @@ class SpeechGraderModel(nn.Module):
         Returns:
         training_objective_predictions (dict of str: [float]): mapping of training objective to the predicted label
         """
-        sequence_output, pooled_output = self.model(**batch, return_dict=False)
+        bert_sequence_output, bert_pooled_output = self.bert(**batch, return_dict=False)
         training_objective_predictions = {}
 
         for objective in self.decoder_objectives:
-            scoring_input = pooled_output if objective == 'score' else sequence_output
+            scoring_input = bert_pooled_output if objective == 'score' else bert_sequence_output
             decoded_objective = getattr(self, objective + '_decoder')(scoring_input)
             decoded_objective = self.score_scaler(decoded_objective) if objective == 'score' else decoded_objective
             training_objective_predictions[objective] = decoded_objective.view(-1, decoded_objective.shape[2]) \
