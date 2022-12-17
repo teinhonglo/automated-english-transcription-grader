@@ -187,6 +187,20 @@ def main():
                 args.model, args.data_dir, args.max_seq_length, args.special_tokens,
                 logger, args.score_name, tokenizer=tokenizer, evaluate=True, reload=args.overwrite_cache)
             trainer = train.Trainer(args, grader, training_objectives, bert_tokenizer=tokenizer)
+        elif args.model == 'pool':
+            tokenizer = AutoTokenizer.from_pretrained(args.model_path, additional_special_tokens=args.special_tokens, use_fast=False, do_lower_case=args.do_lower_case)
+            config = AutoConfig.from_pretrained(args.model_path, output_hidden_states=True)
+            training_objectives = get_auxiliary_objectives(args, tokenizer.vocab_size)
+            config.training_objectives = training_objectives
+            config.max_score = args.max_score
+            grader = auto_model.SpeechGraderPoolModel(config=config).to(args.device)
+            train_data = data.load_and_cache_examples(
+                args.model, args.data_dir, args.max_seq_length, args.special_tokens,
+                logger, args.score_name, tokenizer=tokenizer, reload=args.overwrite_cache)
+            dev_data = data.load_and_cache_examples(
+                args.model, args.data_dir, args.max_seq_length, args.special_tokens,
+                logger, args.score_name, tokenizer=tokenizer, evaluate=True, reload=args.overwrite_cache)
+            trainer = train.Trainer(args, grader, training_objectives, bert_tokenizer=tokenizer)
         else:
             args.logger.info("--model must be either 'lstm' or 'bert' or 'auto'")
             return
@@ -226,6 +240,17 @@ def main():
             training_objectives = get_auxiliary_objectives(train_args, tokenizer.vocab_size)
             config = AutoConfig.from_pretrained(os.path.join(args.exp_root, args.model_dir))
             grader = auto_model.SpeechGraderModel.from_pretrained(os.path.join(args.exp_root, args.model_dir), config=config).to(args.device)
+            test_data = data.load_and_cache_examples(
+                train_args.model, args.data_dir, train_args.max_seq_length, train_args.special_tokens,
+                logger, args.score_name, tokenizer=tokenizer, test=True, reload=args.overwrite_cache)
+            trainer = train.Trainer(train_args, grader, training_objectives, bert_tokenizer=tokenizer)
+        else:
+            tokenizer = AutoTokenizer.from_pretrained(os.path.join(args.exp_root, args.model_dir), do_lower_case=args.do_lower_case)
+            training_objectives = get_auxiliary_objectives(train_args, tokenizer.vocab_size)
+            config = AutoConfig.from_pretrained(os.path.join(args.exp_root, args.model_dir))
+            grader = auto_model.SpeechGraderPoolModel(config=config).to(args.device)
+            grader.load_state_dict(torch.load(os.path.join(args.exp_root, args.model_dir, 'pool.model')))
+            grader.encoder.from_pretrained(os.path.join(args.exp_root, args.model_dir), config=config).to(args.device)
             test_data = data.load_and_cache_examples(
                 train_args.model, args.data_dir, train_args.max_seq_length, train_args.special_tokens,
                 logger, args.score_name, tokenizer=tokenizer, test=True, reload=args.overwrite_cache)
