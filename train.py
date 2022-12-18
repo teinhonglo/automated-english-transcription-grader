@@ -118,10 +118,12 @@ class Trainer:
             if i == len(eval_dataloader):
                 end = len(self.eval_data)
 
-            self.grader.eval()
+            #self.grader.eval()
             inputs, labels = self._get_inputs_and_labels(batch, eval=True)
-            predictions = self.grader(inputs)
-             
+            self.grader.eval()
+            with torch.no_grad():
+                predictions = self.grader(inputs)
+
             if verbose or self.args.predictions_file:
                 all_score_predictions[start:end] = predictions['score'].detach()
                 all_score_targets[start:end] = labels['score'].detach()
@@ -158,7 +160,7 @@ class Trainer:
     def _get_inputs_and_labels(self, batch, eval=False):
         """Prepares the input and labels for a batch."""
         batch = tuple(t.to(self.args.device) for t in batch)
-        if self.args.model in ['bert', 'auto']:
+        if self.args.model in ['bert', 'auto', 'pool']:
             # Tokens should only be masked during training.
             if not eval and 'mlm' in self.training_objectives:
                 input_ids, mlm_mask = mask_tokens(self.bert_tokenizer, batch[0], self.args.device)
@@ -252,6 +254,10 @@ class Trainer:
         if self.args.model in ['bert', 'auto']:
             self.grader.save_pretrained(output_dir)
             self.bert_tokenizer.save_pretrained(output_dir)
-        else:
+        elif self.args.model == 'lstm':
             torch.save(self.grader.state_dict(), os.path.join(output_dir, 'lstm.model'))
+        else:
+            torch.save(self.grader.state_dict(), os.path.join(output_dir, 'pool.model'))
+            self.grader.encoder.save_pretrained(output_dir)
+            self.bert_tokenizer.save_pretrained(output_dir)
         self.args.logger.info("Saving model checkpoint to %s", output_dir)

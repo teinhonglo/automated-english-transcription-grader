@@ -1,27 +1,39 @@
-
 hostname=`hostname`
 stage=0
 stop_stage=1000
 # data-related
 corpus_dir="../corpus/speaking/GEPT_B1"
-score_names="content pronunciation vocabulary"
+#score_names="content pronunciation vocabulary"
+score_names="content"
 anno_fn="new_111年口說語料.xlsx"
 kfold=5
 folds=`seq 1 $kfold`
-part=3
+part=2
 test_on_valid="true"
 merge_below_b1="false"
 trans_type="trans_stt"
 do_round="true"
 n_resamples=100
 # model-related
-model=bert
-model_type=bert-model
-model_path=bert-base-uncased
+#model=auto          # auto
+#model_type=bert-model  # bert-model transformers=4.3.3, tokenizers=0.10.3
+#model_path=bert-base-uncased # bert-base-uncased
+model=pool          # auto
+model_type=bert-pool  # bert-model transformers=4.3.3, tokenizers=0.10.3
+model_path=bert-base-uncased # bert-base-uncased
 max_score=8
 max_seq_length=512
-num_epochs=6
-score_loss=mse
+score_loss="mse"
+# training-related
+warmup_steps=0  # 0
+weight_decay=0  # 0
+max_grad_norm=1.0   # 1.0
+train_batch_size=8  # 8
+gradient_accumulation_steps=1  # 1
+num_epochs=6        # 6
+learning_rate=5e-5  # 5e-5
+# other
+exp_tag="reg_mseloss_meanpool"
 extra_options=
 
 . ./path.sh
@@ -52,6 +64,10 @@ if [ "$merge_below_b1" == "true" ]; then
     exp_root=${exp_root}_bb1
     runs_root=${runs_root}_bb1
 fi
+
+exp_root=${exp_root}_${exp_tag}
+runs_root=${runs_root}_${exp_tag}
+
 
 set -euo pipefail
 
@@ -104,24 +120,29 @@ if [ $stage -le 1 ] && [ $stop_stage -ge 1 ]; then
             new_runs_root=${runs_root}_r${n_resamples}_${sn}
             output_dir=$model_type/${sn}/${fd}
             model_args_dir=$model_type/${sn}/${fd}
-           
+
             if [ -d $new_exp_root/$model_args_dir/final ]; then
                 echo "$new_exp_root/$model_args_dir/final is already existed."
                 continue
             fi
             
             python3 run_speech_grader.py --do_train --save_best_on_evaluate --save_best_on_train \
-                                         --do_lower_case \
+                                         --do_lower_case --overwrite_cache\
                                          --model $model \
                                          --model_path $model_path \
                                          --num_train_epochs $num_epochs \
+                                         --weight_decay $weight_decay \
+                                         --max_grad_norm $max_grad_norm \
                                          --logging_steps 20 \
-                                         --gradient_accumulation_steps 1 \
+                                         --train_batch_size $train_batch_size \
+                                         --gradient_accumulation_steps $gradient_accumulation_steps \
+                                         --warmup_steps $warmup_steps \
+                                         --learning_rate $learning_rate \
                                          --max_seq_length $max_seq_length \
                                          --max_score $max_score --evaluate_during_training \
+                                         --score_loss $score_loss \
                                          --output_dir $output_dir \
                                          --score_name $sn \
-                                         --score_loss $score_loss \
                                          --data_dir $new_data_dir/$fd \
                                          --runs_root $new_runs_root \
                                          --exp_root $new_exp_root
@@ -154,7 +175,6 @@ if [ $stage -le 2 ] && [ $stop_stage -ge 2 ]; then
                                          --predictions_file $predictions_file \
                                          --data_dir $new_data_dir/$fd \
                                          --score_name $sn \
-                                         --score_loss $score_loss \
                                          --runs_root $new_runs_root \
                                          --output_dir $output_dir \
                                          --exp_root $new_exp_root
