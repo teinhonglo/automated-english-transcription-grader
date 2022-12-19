@@ -15,6 +15,8 @@ deprel_labels = ['X', 'nsubj', 'obj', 'iobj', 'csubj', 'ccomp', 'xcomp', 'obl', 
                  'reparandum', 'punct', 'root', 'dep']
 native_language_labels = ['X', 'French', 'Dutch', 'Polish', 'Vietnamese', 'Thai', 'Arabic']
 
+pretrained_lms = ['deberta', 'auto']
+
 def get_pos_labels():
     return pos_tag_labels
 
@@ -159,7 +161,7 @@ def convert_examples_to_features(examples, model, max_seq_length, special_tokens
 
         if model == 'lstm':
             input_ids = [vocab.get(token, 1) for token in tokens]
-        elif model in ['bert', 'auto']:
+        elif model in ['bert'] + pretrained_lms:
             input_ids = tokenizer.convert_tokens_to_ids([tokenizer.cls_token] + tokens + [tokenizer.sep_token])
             pos_tags = [-1] + pos_tags + [-1]
             dep_rels = [-1] + dep_rels + [-1]

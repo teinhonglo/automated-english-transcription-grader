@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 # and lm (language modelling) for the LSTM speech grader.
 #aux_objs = ['pos', 'deprel', 'native_language', 'mlm', 'lm']
 aux_objs = ['mlm', 'lm']
+pretrained_lms = ['auto', 'deberta']
 
 
 def get_auxiliary_objectives(args, vocab_size):
@@ -34,6 +35,7 @@ def get_auxiliary_objectives(args, vocab_size):
             training_objectives[obj] = (num_predictions, alpha)
             total_weighting += alpha
 
+    
     if total_weighting != 1.0:
         logger.info('Weighting values for objectives must add up to 1, total was {}'.format(total_weighting))
         return
@@ -173,7 +175,7 @@ def main():
                 args.model, args.data_dir, args.max_seq_length, args.special_tokens,
                 logger, args.score_name, tokenizer=tokenizer, evaluate=True, reload=args.overwrite_cache)
             trainer = train.Trainer(args, grader, training_objectives, bert_tokenizer=tokenizer)
-        elif args.model == 'auto':
+        elif args.model in pretrained_lms:
             tokenizer = AutoTokenizer.from_pretrained(args.model_path, additional_special_tokens=args.special_tokens, use_fast=False, do_lower_case=args.do_lower_case)
             config = AutoConfig.from_pretrained(args.model_path)
             training_objectives = get_auxiliary_objectives(args, tokenizer.vocab_size)
@@ -235,7 +237,7 @@ def main():
                 train_args.model, args.data_dir, train_args.max_seq_length, train_args.special_tokens,
                 logger, args.score_name, tokenizer=tokenizer, test=True, reload=args.overwrite_cache)
             trainer = train.Trainer(train_args, grader, training_objectives, bert_tokenizer=tokenizer)
-        elif train_args.model == "auto":
+        elif train_args.model in pretrained_lms:
             tokenizer = AutoTokenizer.from_pretrained(os.path.join(args.exp_root, args.model_dir), do_lower_case=args.do_lower_case)
             training_objectives = get_auxiliary_objectives(train_args, tokenizer.vocab_size)
             config = AutoConfig.from_pretrained(os.path.join(args.exp_root, args.model_dir))

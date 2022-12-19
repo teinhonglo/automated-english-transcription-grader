@@ -72,7 +72,7 @@ data_dir = args.data_dir
 score = args.score
 n_resamples = args.n_resamples
 tsv_fn = args.tsv_fn
-resample_scales = [1,2,4,6,8]
+resample_scales = [1,2,3,4,5,6,7,8]
 
 tsv_path = os.path.join(data_dir, tsv_fn)
 df = pd.read_csv(tsv_path, sep='\t', dtype={"text_id":str})

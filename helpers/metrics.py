@@ -19,6 +19,8 @@ def get_losses(training_objectives, training_objective_predictions, labels, devi
                 criterion = compute_rmse
             elif score_loss == "mcrmse":
                 criterion = compute_mcrmse
+            elif score_loss == "smooth_l1":
+                criterion = nn.SmoothL1Loss().to(device)
         else: 
             criterion = nn.CrossEntropyLoss(ignore_index=-1).to(device)
         
@@ -53,6 +55,7 @@ def compute_rmse(predictions, targets):
     return torch.sqrt(torch.mean((predictions - targets) ** 2))
 
 def compute_mcrmse(all_score_predictions, all_score_targets):
+    print(all_score_predictions.shape, all_score_targets.shape)
     unique_classes = torch.unique(all_score_targets)
     num_classes = len(unique_classes)
     score_rmse = 0.

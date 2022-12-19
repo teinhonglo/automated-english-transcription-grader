@@ -33,7 +33,8 @@ gradient_accumulation_steps=1  # 1
 num_epochs=6        # 6
 learning_rate=5e-5  # 5e-5
 # other
-exp_tag="reg_mseloss_meanpool"
+rprefix=
+score_loss=mse
 extra_options=
 
 . ./path.sh
@@ -65,8 +66,8 @@ if [ "$merge_below_b1" == "true" ]; then
     runs_root=${runs_root}_bb1
 fi
 
-exp_root=${exp_root}_${exp_tag}
-runs_root=${runs_root}_${exp_tag}
+exp_root=${exp_root}
+runs_root=${runs_root}
 
 
 set -euo pipefail
@@ -91,9 +92,9 @@ fi
 
 if [ $stage -le 0 ] && [ $stop_stage -ge 0 ]; then
     for sn in $score_names; do
-        new_data_dir=${data_dir}_r${n_resamples}_${sn}
-        new_exp_root=${exp_root}_r${n_resamples}_${sn}
-        new_runs_root=${runs_root}_r${n_resamples}_${sn}
+        new_data_dir=${data_dir}_${rprefix}r${n_resamples}_${sn}
+        new_exp_root=${exp_root}_${rprefix}r${n_resamples}_${sn}
+        new_runs_root=${runs_root}_${rprefix}r${n_resamples}_${sn}
         
         echo $new_data_dir
         if [ ! -d $new_data_dir ]; then
@@ -115,9 +116,9 @@ if [ $stage -le 1 ] && [ $stop_stage -ge 1 ]; then
     for sn in $score_names; do
         for fd in $folds; do
             # model_args_dir
-            new_data_dir=${data_dir}_r${n_resamples}_${sn}
-            new_exp_root=${exp_root}_r${n_resamples}_${sn}
-            new_runs_root=${runs_root}_r${n_resamples}_${sn}
+            new_data_dir=${data_dir}_${rprefix}r${n_resamples}_${sn}
+            new_exp_root=${exp_root}_${rprefix}r${n_resamples}_${sn}
+            new_runs_root=${runs_root}_${rprefix}r${n_resamples}_${sn}
             output_dir=$model_type/${sn}/${fd}
             model_args_dir=$model_type/${sn}/${fd}
 
@@ -156,9 +157,9 @@ if [ $stage -le 2 ] && [ $stop_stage -ge 2 ]; then
     
     for sn in $score_names; do
         for fd in $folds; do
-            new_data_dir=${data_dir}_r${n_resamples}_${sn}
-            new_exp_root=${exp_root}_r${n_resamples}_${sn}
-            new_runs_root=${runs_root}_r${n_resamples}_${sn}
+            new_data_dir=${data_dir}_${rprefix}r${n_resamples}_${sn}
+            new_exp_root=${exp_root}_${rprefix}r${n_resamples}_${sn}
+            new_runs_root=${runs_root}_${rprefix}r${n_resamples}_${sn}
             
             output_dir=$model_type/${sn}/${fd}
             model_args_dir=$model_type/${sn}/${fd}
@@ -184,8 +185,8 @@ fi
 
 if [ $stage -le 3 ] && [ $stop_stage -ge 3 ]; then  
     for sn in $score_names; do
-        new_data_dir=${data_dir}_r${n_resamples}_${sn}
-        new_runs_root=${runs_root}_r${n_resamples}_${sn}
+        new_data_dir=${data_dir}_${rprefix}r${n_resamples}_${sn}
+        new_runs_root=${runs_root}_${rprefix}r${n_resamples}_${sn}
         python local/speaking_predictions_to_report.py  --data_dir $new_data_dir \
                                                         --result_root $new_runs_root/$model_type \
                                                         --folds "$folds" \
@@ -194,10 +195,10 @@ if [ $stage -le 3 ] && [ $stop_stage -ge 3 ]; then
 fi
 
 if [ $stage -le 4 ] && [ $stop_stage -ge 4 ]; then  
-    echo $runs_root/$model_type
     for sn in $score_names; do
-        new_data_dir=${data_dir}_r${n_resamples}_${sn}
-        new_runs_root=${runs_root}_r${n_resamples}_${sn}
+        new_data_dir=${data_dir}_${rprefix}r${n_resamples}_${sn}
+        new_runs_root=${runs_root}_${rprefix}r${n_resamples}_${sn}
+        echo $new_runs_root/$model_type
 
         python local/visualization.py   --result_root $new_runs_root/$model_type \
                                         --scores "$sn"

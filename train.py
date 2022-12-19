@@ -11,6 +11,7 @@ from tqdm import tqdm, trange
 
 from helpers.masked_lm import get_special_tokens_mask, mask_tokens
 from helpers.metrics import get_losses, compute_metrics
+pretrained_lms = ['auto', 'deberta']
 
 
 class Trainer:
@@ -251,7 +252,7 @@ class Trainer:
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
 
-        if self.args.model in ['bert', 'auto']:
+        if self.args.model in ['bert'] or self.args.model in pretrained_lms:
             self.grader.save_pretrained(output_dir)
             self.bert_tokenizer.save_pretrained(output_dir)
         elif self.args.model == 'lstm':
