@@ -53,7 +53,9 @@ for score in scores:
 for score in list(kfold_info.keys()):
     for nf in list(kfold_info[score].keys()):
         for anno_type, pred_type in zip(anno_columns, pred_columns):
-            file_name = os.path.join(result_root, "-".join([score, pred_type, nf])) + ".png"
+            file_name = os.path.join(result_root, "-".join([score, pred_type, nf]))
+            png_name = file_name + ".png"
+            excel_name = file_name + ".xlsx"
              
             y_true = kfold_info[score][nf][anno_type]
             y_pred = kfold_info[score][nf][pred_type]
@@ -77,5 +79,7 @@ for score in list(kfold_info.keys()):
             sns.heatmap(data=conf_mat_prec_df, annot=conf_mat_df, fmt='g')
             plt.xlabel("Predictions")
             plt.ylabel("Annotations")
-            plt.savefig(file_name)
+            plt.savefig(png_name)
             plt.clf()
+            
+            #conf_mat_prec_df.to_excel(excel_name)
