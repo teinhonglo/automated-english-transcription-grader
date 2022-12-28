@@ -15,11 +15,8 @@ trans_type="trans_stt"
 do_round="true"
 n_resamples=100
 # model-related
-#model=auto          # auto
-#model_type=bert-model  # bert-model transformers=4.3.3, tokenizers=0.10.3
-#model_path=bert-base-uncased # bert-base-uncased
 model=pool          # auto
-model_type=bert-pool  # bert-model transformers=4.3.3, tokenizers=0.10.3
+exp_tag=bert-pool  # bert-model transformers=4.3.3, tokenizers=0.10.3
 model_path=bert-base-uncased # bert-base-uncased
 max_score=8
 max_seq_length=512
@@ -119,8 +116,8 @@ if [ $stage -le 1 ] && [ $stop_stage -ge 1 ]; then
             new_data_dir=${data_dir}_${rprefix}r${n_resamples}_${sn}
             new_exp_root=${exp_root}_${rprefix}r${n_resamples}_${sn}
             new_runs_root=${runs_root}_${rprefix}r${n_resamples}_${sn}
-            output_dir=$model_type/${sn}/${fd}
-            model_args_dir=$model_type/${sn}/${fd}
+            output_dir=$exp_tag/${sn}/${fd}
+            model_args_dir=$exp_tag/${sn}/${fd}
 
             if [ -d $new_exp_root/$model_args_dir/final ]; then
                 echo "$new_exp_root/$model_args_dir/final is already existed."
@@ -161,8 +158,8 @@ if [ $stage -le 2 ] && [ $stop_stage -ge 2 ]; then
             new_exp_root=${exp_root}_${rprefix}r${n_resamples}_${sn}
             new_runs_root=${runs_root}_${rprefix}r${n_resamples}_${sn}
             
-            output_dir=$model_type/${sn}/${fd}
-            model_args_dir=$model_type/${sn}/${fd}
+            output_dir=$exp_tag/${sn}/${fd}
+            model_args_dir=$exp_tag/${sn}/${fd}
             model_dir=$model_args_dir/best_train
             predictions_file="$new_runs_root/$output_dir/predictions.txt"
             
@@ -188,9 +185,9 @@ if [ $stage -le 3 ] && [ $stop_stage -ge 3 ]; then
         new_data_dir=${data_dir}_${rprefix}r${n_resamples}_${sn}
         new_runs_root=${runs_root}_${rprefix}r${n_resamples}_${sn}
         python local/speaking_predictions_to_report.py  --data_dir $new_data_dir \
-                                                        --result_root $new_runs_root/$model_type \
+                                                        --result_root $new_runs_root/$exp_tag \
                                                         --folds "$folds" \
-                                                        --scores "$score_names" > $new_runs_root/$model_type/report.log
+                                                        --scores "$score_names" > $new_runs_root/$exp_tag/report.log
     done
 fi
 
@@ -198,9 +195,9 @@ if [ $stage -le 4 ] && [ $stop_stage -ge 4 ]; then
     for sn in $score_names; do
         new_data_dir=${data_dir}_${rprefix}r${n_resamples}_${sn}
         new_runs_root=${runs_root}_${rprefix}r${n_resamples}_${sn}
-        echo $new_runs_root/$model_type
+        echo $new_runs_root/$exp_tag
 
-        python local/visualization.py   --result_root $new_runs_root/$model_type \
+        python local/visualization.py   --result_root $new_runs_root/$exp_tag \
                                         --scores "$sn"
     done
 fi
