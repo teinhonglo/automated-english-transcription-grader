@@ -119,7 +119,7 @@ for nf in n_folds:
 total_losses = defaultdict(dict)
 total_df_losses = defaultdict(dict)
 average_losses = defaultdict(dict)
-infos = ["anno", "anno(cefr)", "pred", "pred(cefr)"]
+infos = ["anno", "pred"]
 
 scores_ = []
 for nf in n_folds:
@@ -139,7 +139,7 @@ for score in scores:
 print("ORIGIN")
 print("scores", scores)
 
-all_bins = np.array([1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5])
+all_bins = np.array([1.5, 2.5, 3.5, 4.5])
 for score in scores: 
     for nf in n_folds: 
         total_losses[score][nf] = {}
@@ -165,37 +165,9 @@ for score in scores:
     df_losses = pd.DataFrame.from_dict(df_losses)
     print(df_losses.mean())
 
-print()
-print("CEFR")
-cefr_bins = np.array([2.5, 4.5, 6.5])
-
-for score in scores:
-    
-    for nf in n_folds: 
-        total_losses[score][nf] = {}
-        total_losses[score][nf], all_score_preds, all_score_annos = evaluation(total_losses[score][nf], csv_dict[nf], score, cefr_bins)
-        kfold_dir = os.path.join(result_root, score, nf) 
-        
-        kfold_info[score][nf]["anno(cefr)"] += all_score_annos.tolist()
-        kfold_info[score][nf]["pred(cefr)"] += all_score_preds.tolist() 
-        kfold_info[score]["All"]["anno(cefr)"] += all_score_annos.tolist()
-        kfold_info[score]["All"]["pred(cefr)"] += all_score_preds.tolist()
-        
+for score in scores: 
     result_dir = os.path.join(result_root, score)
     with pd.ExcelWriter(os.path.join(result_dir, "kfold_detail.xlsx")) as writer:
         for f in list(kfold_info[score].keys()):
             df = pd.DataFrame(kfold_info[score][f])
-            df.to_excel(writer, sheet_name=f)   
-    
-    ave_losses = {k:0 for k in list(total_losses[score][n_folds[0]]["origin"].keys())}
-    df_losses = {k:[] for k in list(total_losses[score][n_folds[0]]["origin"].keys())}
-        
-    for nf in n_folds: 
-        for metric in list(total_losses[score][nf]["origin"].keys()):
-            ave_losses[metric] += 1/len(n_folds) * total_losses[score][nf]["origin"][metric]
-            df_losses[metric].append(total_losses[score][nf]["origin"][metric])
-
-    average_losses[score] = ave_losses
-    print(score, ave_losses)
-    df_losses = pd.DataFrame.from_dict(df_losses)
-    print(df_losses.mean())
+            df.to_excel(writer, sheet_name=f) 
