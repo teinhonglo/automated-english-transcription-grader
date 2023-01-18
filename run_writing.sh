@@ -3,8 +3,9 @@ hostname=`hostname`
 stage=0
 stop_stage=1000
 # data-related
-corpus_dir="../corpus/writing/GSAT"
-score_names="content organization grammar vocabulary"
+corpus_dir="/share/nas167/teinhonglo/AcousticModel/spoken_test/corpus/writing/GSAT"
+#score_names="content organization grammar vocabulary"
+score_names="content"
 anno_fn="109年寫作語料.xlsx"
 kfold=5
 folds=`seq 1 $kfold`
@@ -12,13 +13,21 @@ test_on_valid="true"
 trans_type="origin"
 do_l2r="false"
 # model-related
-model=bert
-model_type=bert-model
-model_path=bert-base-uncased
-num_epochs=3
+model=pool
+model_type=electra-base-discriminator
+model_path=google/electra-base-discriminator
+score_loss="mse"
+num_epochs=6
 max_score=8
 max_seq_length=512
 extra_options=""
+# training-related
+warmup_steps=150  # 0
+max_grad_norm=10   # 1.0
+learning_rate=5e-5  # 5e-5
+eval_mode="final"
+
+exp_tag="reg_mseloss_meanpool_warmup150_reinit2_clip10_mlm0.1word0.2"
 
 . ./path.sh
 . ./parse_options.sh
@@ -38,6 +47,9 @@ if [ "$do_l2r" == "true" ]; then
     exp_root=${exp_root}_l2r
     runs_root=${runs_root}_l2r
 fi
+
+exp_root=${exp_root}_${exp_tag}
+runs_root=${runs_root}_${exp_tag}
 
 set -euo pipefail
 
@@ -70,8 +82,15 @@ if [ $stage -le 1 ] && [ $stop_stage -ge 1 ]; then
                                          --model_path $model_path \
                                          --num_train_epochs $num_epochs \
                                          --gradient_accumulation_steps 1 \
+                                         --max_grad_norm $max_grad_norm \
                                          --max_seq_length $max_seq_length \
+                                         --warmup_steps $warmup_steps \
+                                         --learning_rate $learning_rate \
                                          --max_score $max_score --evaluate_during_training \
+                                         --use_mlm_objective \
+                                         --mlm_alpha 0.1 \
+                                         --score_alpha 0.9 \
+                                         --score_loss $score_loss \
                                          --output_dir $output_dir \
                                          --score_name $sn \
                                          --data_dir $data_dir/$fd \
@@ -90,7 +109,7 @@ if [ $stage -le 2 ] && [ $stop_stage -ge 2 ]; then
         for fd in $folds; do
             output_dir=$model_type/${sn}/${fd}
             model_args_dir=$model_type/${sn}/${fd}
-            model_dir=$model_args_dir/best_train
+            model_dir=$model_args_dir/${eval_mode}
             predictions_file="$runs_root/$output_dir/predictions.txt"
             
             python3 run_speech_grader.py --do_test --model $model \
@@ -100,6 +119,9 @@ if [ $stage -le 2 ] && [ $stop_stage -ge 2 ]; then
                                          --max_seq_length $max_seq_length \
                                          --max_score $max_score \
                                          --model_dir $model_dir \
+                                         --use_mlm_objective \
+                                         --mlm_alpha 0.1 \
+                                         --score_alpha 0.9 \
                                          --predictions_file $predictions_file \
                                          --data_dir $data_dir/$fd \
                                          --score_name $sn \

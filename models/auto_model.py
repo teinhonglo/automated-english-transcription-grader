@@ -3,6 +3,36 @@ import torch.nn as nn
 from transformers import AutoModel, AutoTokenizer, AutoConfig
 from transformers.models.bert.modeling_bert import BertPreTrainedModel, BertPredictionHeadTransform
 
+def freeze(module):
+    """
+    Freezes module's parameters.
+    """
+    
+    for parameter in module.parameters():
+        parameter.requires_grad = False
+
+def score_scaler(x, slope=1, x_shift=0, y_shift=0, max_score=1, trainable=False):
+    if trainable:
+        slope = torch.nn.Parameter(torch.ones(1), requires_grad=True).to(x.device)
+        x_shift = torch.nn.Parameter(torch.zeros(1), requires_grad=True).to(x.device)
+    return max_score * torch.sigmoid( slope * ( x - x_shift ) ) + y_shift
+
+def reinit_layers(model, config, reinit_layers=2):
+    #reinit_layers = 2 #2 is useful only for ELECTEA
+    for layer in model.encoder.layer[-reinit_layers:]:
+        for module in layer.modules():
+            if isinstance(module, nn.Linear):
+                module.weight.data.normal_(mean=0.0, std=config.initializer_range)
+                if module.bias is not None:
+                    module.bias.data.zero_()
+            elif isinstance(module, nn.Embedding):
+                module.weight.data.normal_(mean=0.0, std=config.initializer_range)
+                if module.padding_idx is not None:
+                    module.weight.data[module.padding_idx].zero_()
+            elif isinstance(module, nn.LayerNorm):
+                module.bias.data.zero_()
+                module.weight.data.fill_(1.0)
+
 class MeanPooling(nn.Module):
     def __init__(self):
         super(MeanPooling, self).__init__()
@@ -95,8 +125,15 @@ class SpeechGraderModel(BertPreTrainedModel):
         super(SpeechGraderModel, self).__init__(config)
 
         self.config = config
+        config.output_hidden_states = True
+        #config.hidden_dropout = 0.
+        #config.hidden_dropout_prob = 0.
+        #config.attention_dropout = 0.
+        #config.attention_probs_dropout_prob = 0.
+        
         self.bert = AutoModel.from_config(config)
-
+        self.max_score = config.max_score
+        
         # Creates a prediction head per objective.
         self.decoder_objectives = config.training_objectives.keys()
         for objective, objective_params in config.training_objectives.items():
@@ -109,49 +146,36 @@ class SpeechGraderModel(BertPreTrainedModel):
         self.score_scaler = nn.Hardtanh(min_val=0, max_val=config.max_score)
         self.init_weights()
 
+        #reinit_layers(self.bert, config, reinit_layers=2)
+
     def forward(self, batch):
         """
         Returns:
         training_objective_predictions (dict of str: [float]): mapping of training objective to the predicted label
         """
-        bert_sequence_output, bert_pooled_output = self.bert(**batch, return_dict=False)
+        bert_sequence_output = self.bert(**batch, return_dict=True)['last_hidden_state']
+        bert_pooled_output = bert_sequence_output[:, 0]
         training_objective_predictions = {}
 
         for objective in self.decoder_objectives:
             scoring_input = bert_pooled_output if objective == 'score' else bert_sequence_output
             decoded_objective = getattr(self, objective + '_decoder')(scoring_input)
             decoded_objective = self.score_scaler(decoded_objective) if objective == 'score' else decoded_objective
+            #decoded_objective = score_scaler(decoded_objective, slope=2, x_shift=0, y_shift=0, max_score=self.max_score, trainable=False) \
+            #    if objective == 'score' else decoded_objective
             training_objective_predictions[objective] = decoded_objective.view(-1, decoded_objective.shape[2]) \
                 if objective != 'score' else decoded_objective.squeeze()
 
         return training_objective_predictions
 
-class PredictionPoolHead(nn.Module):
+class SimplePredictionHead(nn.Module):
     '''
-    A prediction head for a single objective of the SpeechGraderModel.
-
-    Args:
-        config (AutoConfig): the config for the the pre-trained BERT model
-        num_labels (int): the number of labels that can be predicted
-
-    Attributes:
-        transform (transformers.modeling_bert.BertPredictionHeadTransform): a dense linear layer with gelu activation
-            function
-        decoder (torch.nn.Linear): a linear layer that makes predictions across the labels
-        bias (torch.nn.Parameter): biases per label
+        prediction head with simple linear
     '''
-    def __init__(self, config, num_labels, mode="mean"):
-        super(PredictionPoolHead, self).__init__()
+
+    def __init__(self, config, num_labels):
+        super(SimplePredictionHead, self).__init__()
         self.config = config
-        self.mode = mode
-        if self.mode == "mean":
-            self.pooler = MeanPooling()
-        elif self.mode == "weighted":
-            self.pooler = WeightedLayerPooling(config.num_hidden_layers)
-        else:
-            self.pooler = LSTMPooling(config.num_hidden_layers,
-                 config.hidden_size, config.hidden_size, 0.1, is_lstm=True
-            )
         self.fc = nn.Linear(self.config.hidden_size, num_labels)
         self._init_weights(self.fc)
 
@@ -168,59 +192,73 @@ class PredictionPoolHead(nn.Module):
             module.bias.data.zero_()
             module.weight.data.fill_(1.0)
 
-    def forward(self, outputs, inputs):
-
-        last_hidden_states = outputs['last_hidden_state']
-        all_hidden_states = outputs['hidden_states']
-
-        if self.mode == 'mean':
-            feature = self.pooler(last_hidden_states, inputs['attention_mask'])
-        elif self.mode == 'weighted':
-            feature = self.pooler(all_hidden_states)
-        elif self.mode in ['gru', 'lstm']:
-            feature = self.pooler(all_hidden_states)
-        else:
-            raise ValueError('Unknown pooling type')
-
+    def forward(self, feature):
         outputs = self.fc(feature)
-
         return outputs
 
 class SpeechGraderPoolModel(nn.Module):
     def __init__(self, config, num_classes=1, mode="mean"):
         super(SpeechGraderPoolModel,self).__init__()
-        #self.model_name = config['model']
-        #self.freeze = config['freeze_encoder']
+
         config.hidden_dropout = 0.
         config.hidden_dropout_prob = 0.
         config.attention_dropout = 0.
         config.attention_probs_dropout_prob = 0.
-        #config.output_hidden_states = True
-        #self.encoder = AutoModel.from_pretrained(self.model_name)
+
         self.encoder = AutoModel.from_config(config)
- 
-        #if self.freeze:
-        #    for param in self.encoder.base_model.parameters():
-        #        param.requires_grad = False
+        self.max_score = config.max_score
+        
+        self.mode = mode
+        if self.mode == "mean":
+            self.pooler = MeanPooling()
+        elif self.mode == "weighted":
+            self.pooler = WeightedLayerPooling(config.num_hidden_layers)
+        elif self.mode == "lstm":
+            self.pooler = LSTMPooling(config.num_hidden_layers,
+                 config.hidden_size, config.hidden_size, 0.1, is_lstm=True
+            )
 
         # Creates a pooling prediction head per objective.
         self.decoder_objectives = config.training_objectives.keys()
         for objective, objective_params in config.training_objectives.items():
             num_predictions, _ = objective_params
-            decoder = PredictionPoolHead(self.encoder.config, num_predictions, mode)
+            decoder = SimplePredictionHead(self.encoder.config, num_predictions)
             setattr(self, objective + '_decoder', decoder)
 
         # The score scaler is used to force the result of the score prediction head to be within the range of possible
         # scores.
         #self.score_scaler = nn.Hardtanh(min_val=0, max_val=config.max_score)
+        
+        # reinit last n layers
+        reinit_layers(self.encoder, config, reinit_layers=2)
+        # freeze first n layers when use large model
+        #freeze(self.encoder.embeddings)
+        #freeze(self.encoder.encoder.layer[:12])
+
 
     def forward(self, inputs):
         outputs = self.encoder(**inputs, return_dict=True)
 
+        last_hidden_states = outputs['last_hidden_state']
+        all_hidden_states = outputs['hidden_states']
+
         training_objective_predictions = {}
         for objective in self.decoder_objectives:
-            decoded_objective = getattr(self, objective + '_decoder')(outputs, inputs)
+            
+            if objective == 'score':
+                if self.mode == 'mean':
+                    feature = self.pooler(last_hidden_states, inputs['attention_mask'])
+                elif self.mode == ['weighted', 'gru', 'lstm']:
+                    feature = self.pooler(all_hidden_states)
+                else:
+                    raise ValueError('Unknown pooling type')
+            else:
+                feature = last_hidden_states
+
+            decoded_objective = getattr(self, objective + '_decoder')(feature)
             #decoded_objective = self.score_scaler(decoded_objective) if objective == 'score' else decoded_objective
+            #decoded_objective = score_scaler(decoded_objective, slope=1, x_shift=0, y_shift=0, max_score=self.max_score, trainable=False) \
+            #    if objective == 'score' else decoded_objective
             training_objective_predictions[objective] = decoded_objective.view(-1, decoded_objective.shape[2]) \
                 if objective != 'score' else decoded_objective.squeeze()
 

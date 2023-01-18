@@ -152,7 +152,6 @@ def convert_examples_to_features(examples, model, max_seq_length, special_tokens
                     dep_rels.extend(token_padding)
                     native_language.extend(token_padding)
 
-
         if len(tokens) > max_seq_length - special_tokens_count:
             tokens = tokens[:(max_seq_length - special_tokens_count)]
             pos_tags = pos_tags[:(max_seq_length - special_tokens_count)]
@@ -196,7 +195,7 @@ def convert_examples_to_features(examples, model, max_seq_length, special_tokens
         assert len(native_language) == max_seq_length
 
         score = float(example.score)
-
+        '''
         if ex_index < 5:
             logger.info("*** Example ***")
             logger.info("id: %s" % (example.id))
@@ -207,6 +206,7 @@ def convert_examples_to_features(examples, model, max_seq_length, special_tokens
             if model in ['bert', 'auto', 'pool']:
                 logger.info("segment_ids: %s" % " ".join([str(x) for x in segment_ids]))
             logger.info("score: %d)" % (score))
+        '''
 
         features.append(
                 InputFeatures(input_ids=input_ids,

@@ -35,7 +35,7 @@ parser.add_argument("--tsv_fn",
                     type=str)
 
 parser.add_argument("--scores",
-                    default="content pronunciation vocabulary",
+                    default="holistic",
                     type=str)
 
 args = parser.parse_args()
@@ -107,20 +107,15 @@ for nf in n_folds:
         for i, row in tqdm(enumerate(csv_reader)):
             if i == 0: continue 
             text_id, text = row[:2]
-            content, pronunciation, vocabulary = row[2:]
-            content, pronunciation, vocabulary = float(content), float(pronunciation), float(vocabulary)
+            holistic = float(row[2])
             
             text_ids[nf].append(text_id)
             csv_dict[nf][text_id]["anno"] = {
-                                                "content": content,
-                                                "pronunciation": pronunciation,
-                                                "vocabulary": vocabulary
+                                                "holistic": holistic
                                              }
             
             csv_dict[nf][text_id]["pred"] = {   
-                                                "content": content,
-                                                "pronunciation": pronunciation,
-                                                "vocabulary": vocabulary
+                                                "holistic": holistic,
                                             }
 
 # fiiled csv_dict

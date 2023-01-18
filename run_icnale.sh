@@ -2,36 +2,34 @@ hostname=`hostname`
 gpu=0
 stage=0
 stop_stage=1000
-
 # data-related
 corpus_dir="../corpus/speaking/GEPT_B1"
 #score_names="content pronunciation vocabulary"
-score_names="content"
+score_names="holistic"
 anno_fn="new_111年口說語料.xlsx"
 kfold=5
-folds=`seq 1 $kfold`
-part=2
-test_on_valid="true"
+#folds=`seq 1 $kfold`
+folds=1
+part=1
+test_on_valid="false"
 merge_below_b1="false"
-trans_type="trans_stt"
-do_round="true"
+trans_type="trans_stt_whisperv2_large"
+do_round="false"
 n_resamples=100 #100
-rprefix="m"
-
+r_prefix="m"
 # model-related
 model=pool          # auto
-exp_tag=electra-base-discriminator  # bert-model transformers=4.3.3, tokenizers=0.10.3
+model_type=electra-base-discriminator  # bert-model transformers=4.3.3, tokenizers=0.10.3
 model_path=google/electra-base-discriminator # bert-base-uncased
 #model=pool          # auto
-#exp_tag=bert-base-uncased  # bert-model transformers=4.3.3, tokenizers=0.10.3
+#model_type=bert-base-uncased  # bert-model transformers=4.3.3, tokenizers=0.10.3
 #model_path=bert-base-uncased # bert-base-uncased
 #model=pool          # auto
-#exp_tag=electra-base-discriminator  # bert-model transformers=4.3.3, tokenizers=0.10.3
+#model_type=electra-base-discriminator  # bert-model transformers=4.3.3, tokenizers=0.10.3
 #model_path=exp-writting/gsat109/origin_tov_reg_mseloss_meanpool_warmup150_reinit2_clip10_mlm0.1word0.2/electra-base-discriminator/content/5/best
-max_score=8
+max_score=5
 max_seq_length=512 #512
 score_loss="mse"
-
 # training-related
 warmup_steps=150  # 0
 weight_decay=0  # 0
@@ -40,21 +38,21 @@ train_batch_size=8  # 8
 gradient_accumulation_steps=1  # 1
 num_epochs=6        # 6
 learning_rate=5e-5  # 5e-5
-eval_mode="final"
-
+eval_mode="best"
 # other
 #--use_mlm_objective
 #--mlm_alpha 0.05 \
 #--score_alpha 0.95 \
+exp_tag="reg_mseloss_meanpool_warmup150_clip10_mlm0.1word0.2"
 extra_options=
 
 . ./path.sh
 . ./parse_options.sh
 
 
-data_dir=data-speaking/gept-p${part}/$trans_type
-exp_root=exp-speaking/gept-p${part}/$trans_type
-runs_root=runs-speaking/gept-p${part}/$trans_type
+data_dir=data-speaking/icnale/$trans_type
+exp_root=exp-speaking/icnale/$trans_type
+runs_root=runs-speaking/icnale/$trans_type
 
 if [ "$test_on_valid" == "true" ]; then
     extra_options="--test_on_valid"
@@ -77,6 +75,9 @@ if [ "$merge_below_b1" == "true" ]; then
     runs_root=${runs_root}_bb1
 fi
 
+exp_root=${exp_root}_${exp_tag}
+runs_root=${runs_root}_${exp_tag}
+
 
 set -euo pipefail
 
@@ -98,48 +99,24 @@ if [ $stage -le -1 ] && [ $stop_stage -ge -1 ]; then
     fi
 fi
 
-if [ $stage -le 0 ] && [ $stop_stage -ge 0 ]; then
-    for sn in $score_names; do
-        new_data_dir=${data_dir}_${rprefix}r${n_resamples}_${sn}
-        new_exp_root=${exp_root}_${rprefix}r${n_resamples}_${sn}
-        new_runs_root=${runs_root}_${rprefix}r${n_resamples}_${sn}
-
-        echo $new_data_dir
-        if [ ! -d $new_data_dir ]; then
-            mkdir -p $new_data_dir;
-            rsync -a --exclude=*cached* $data_dir/ $new_data_dir/
-            for fd in $folds; do
-                python local/do_resample_max.py --data_dir $new_data_dir/$fd \
-                                        --score $sn \
-                                        --n_resamples $n_resamples
-            done
-        else
-            echo "$new_data_dir is already existed"
-        fi
-    done
-fi
-
 if [ $stage -le 1 ] && [ $stop_stage -ge 1 ]; then  
      
     for sn in $score_names; do
         for fd in $folds; do
             # model_args_dir
-            new_data_dir=${data_dir}_${rprefix}r${n_resamples}_${sn}
-            new_exp_root=${exp_root}_${rprefix}r${n_resamples}_${sn}
-            new_runs_root=${runs_root}_${rprefix}r${n_resamples}_${sn}
-            output_dir=$exp_tag/${sn}/${fd}
-            model_args_dir=$exp_tag/${sn}/${fd}
+            output_dir=$model_type/${sn}/${fd}
+            model_args_dir=$model_type/${sn}/${fd}
 
-            if [ -d $new_exp_root/$model_args_dir/final ]; then
-                echo "$new_exp_root/$model_args_dir/final is already existed."
+            if [ -d $exp_root/$model_args_dir/final ]; then
+                echo "$exp_root/$model_args_dir/final is already existed."
                 continue
             fi
             
             CUDA_VISIBLE_DEVICES=$gpu python3 run_speech_grader.py --do_train --save_best_on_evaluate --save_best_on_train \
                                          --overwrite_cache --do_lower_case \
                                          --use_mlm_objective \
-                                         --mlm_alpha 0.05 \
-                                         --score_alpha 0.95 \
+                                         --mlm_alpha 0.1 \
+                                         --score_alpha 0.9 \
                                          --model $model \
                                          --model_path $model_path \
                                          --num_train_epochs $num_epochs \
@@ -155,9 +132,9 @@ if [ $stage -le 1 ] && [ $stop_stage -ge 1 ]; then
                                          --score_loss $score_loss \
                                          --output_dir $output_dir \
                                          --score_name $sn \
-                                         --data_dir $new_data_dir/$fd \
-                                         --runs_root $new_runs_root \
-                                         --exp_root $new_exp_root
+                                         --data_dir $data_dir/$fd \
+                                         --runs_root $runs_root \
+                                         --exp_root $exp_root
         done
     done
 fi
@@ -168,19 +145,16 @@ if [ $stage -le 2 ] && [ $stop_stage -ge 2 ]; then
     
     for sn in $score_names; do
         for fd in $folds; do
-            new_data_dir=${data_dir}_${rprefix}r${n_resamples}_${sn}
-            new_exp_root=${exp_root}_${rprefix}r${n_resamples}_${sn}
-            new_runs_root=${runs_root}_${rprefix}r${n_resamples}_${sn}
-
-            output_dir=$exp_tag/${sn}/${fd}
-            model_args_dir=$exp_tag/${sn}/${fd}
+            
+            output_dir=$model_type/${sn}/${fd}
+            model_args_dir=$model_type/${sn}/${fd}
             model_dir=$model_args_dir/$eval_mode
-            predictions_file="$new_runs_root/$output_dir/predictions.txt"
+            predictions_file="$runs_root/$output_dir/predictions.txt"
             
             python3 run_speech_grader.py --do_test --do_lower_case \
                                          --use_mlm_objective \
-                                         --mlm_alpha 0.05 \
-                                         --score_alpha 0.95 \
+                                         --mlm_alpha 0.1 \
+                                         --score_alpha 0.9 \
                                          --model $model \
                                          --model_path $model_path \
                                          --model_args_dir $model_args_dir \
@@ -188,33 +162,29 @@ if [ $stage -le 2 ] && [ $stop_stage -ge 2 ]; then
                                          --max_score $max_score \
                                          --model_dir $model_dir \
                                          --predictions_file $predictions_file \
-                                         --data_dir $new_data_dir/$fd \
+                                         --data_dir $data_dir/$fd \
                                          --score_name $sn \
-                                         --runs_root $new_runs_root \
+                                         --runs_root $runs_root \
                                          --output_dir $output_dir \
-                                         --exp_root $new_exp_root
+                                         --exp_root $exp_root
         done
     done 
 fi
 
 if [ $stage -le 3 ] && [ $stop_stage -ge 3 ]; then  
     for sn in $score_names; do
-        new_data_dir=${data_dir}_${rprefix}r${n_resamples}_${sn}
-        new_runs_root=${runs_root}_${rprefix}r${n_resamples}_${sn}
-        python local/speaking_predictions_to_report.py  --data_dir $new_data_dir \
-                                                        --result_root $new_runs_root/$exp_tag \
+        python local/speaking_predictions_to_report_icnale.py  --data_dir $data_dir \
+                                                        --result_root $runs_root/$model_type \
                                                         --folds "$folds" \
-                                                        --scores "$score_names" > $new_runs_root/$exp_tag/report.log
+                                                        --scores "$score_names" > $runs_root/$model_type/report.log
     done
 fi
 
 if [ $stage -le 4 ] && [ $stop_stage -ge 4 ]; then  
+    echo $runs_root/$model_type
     for sn in $score_names; do
-        new_data_dir=${data_dir}_${rprefix}r${n_resamples}_${sn}
-        new_runs_root=${runs_root}_${rprefix}r${n_resamples}_${sn}
-        echo $new_runs_root/$exp_tag
 
-        python local/visualization.py   --result_root $new_runs_root/$exp_tag \
+        python local/visualization.py   --result_root $runs_root/$model_type \
                                         --scores "$sn"
     done
 fi

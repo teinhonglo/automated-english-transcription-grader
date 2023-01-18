@@ -21,7 +21,7 @@ def mask_tokens(tokenizer, inputs, device):
     inputs[indices_replaced] = tokenizer.convert_tokens_to_ids(tokenizer.mask_token)
 
     # Replace 10% of sampled tokens with a random word
-    indices_random = torch.bernoulli(torch.full(labels.shape, 0.5)).bool() & masked_indices & ~indices_replaced
+    indices_random = torch.bernoulli(torch.full(labels.shape, 0.2)).bool() & masked_indices & ~indices_replaced
     random_words = torch.randint(len(tokenizer), labels.shape, dtype=torch.long, device=device)
     inputs[indices_random] = random_words[indices_random]
 

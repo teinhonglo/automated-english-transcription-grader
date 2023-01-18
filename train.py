@@ -2,7 +2,7 @@ import numpy as np
 import io
 import os
 
-from transformers import AdamW, get_linear_schedule_with_warmup 
+from transformers import AdamW, get_linear_schedule_with_warmup, get_cosine_schedule_with_warmup
 import random
 from tensorboardX import SummaryWriter
 import torch
@@ -12,7 +12,6 @@ from tqdm import tqdm, trange
 from helpers.masked_lm import get_special_tokens_mask, mask_tokens
 from helpers.metrics import get_losses, compute_metrics
 pretrained_lms = ['auto', 'deberta']
-
 
 class Trainer:
     def __init__(self, args, grader, training_objectives, bert_tokenizer=None):
@@ -44,6 +43,7 @@ class Trainer:
             t_total = len(train_dataloader) // self.args.gradient_accumulation_steps * self.args.num_train_epochs
 
         # Prepare optimizer and schedule (linear warmup and decay)
+        
         no_decay = ['bias', 'LayerNorm.weight']
         optimizer_grouped_parameters = [
             {'params': [p for n, p in self.grader.named_parameters() if not any(nd in n for nd in no_decay)],
@@ -51,8 +51,10 @@ class Trainer:
             {'params': [p for n, p in self.grader.named_parameters() if any(nd in n for nd in no_decay)],
              'weight_decay': 0.0}
         ]
+        
         optimizer = AdamW(optimizer_grouped_parameters, lr=self.args.learning_rate, eps=self.args.adam_epsilon)
         scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=self.args.warmup_steps, num_training_steps=t_total)
+        #scheduler = get_cosine_schedule_with_warmup(optimizer, num_warmup_steps=self.args.warmup_steps, num_training_steps=t_total, num_cycles=0.5)
 
         self.args.logger.info("***** Running training *****")
         self.args.logger.info("  Num examples = %d", len(train_data))
