@@ -3,6 +3,7 @@ import os
 import pickle
 import sys
 import torch
+import stanza
 from collections import Counter
 from torch.utils.data import TensorDataset
 
@@ -16,6 +17,13 @@ deprel_labels = ['X', 'nsubj', 'obj', 'iobj', 'csubj', 'ccomp', 'xcomp', 'obl', 
 native_language_labels = ['X', 'French', 'Dutch', 'Polish', 'Vietnamese', 'Thai', 'Arabic']
 
 pretrained_lms = ['deberta', 'auto']
+
+nlp_tokenize = stanza.Pipeline(lang='en', processors='tokenize', use_gpu=False)
+
+def get_pretokenize_result(text):
+    doc = nlp_tokenize(text.lower())
+    tokens = [ token.text for sent in doc.sentences for token in sent.tokens ]
+    return tokens
 
 def get_pos_labels():
     return pos_tag_labels
@@ -89,8 +97,8 @@ class TSVProcessor(object):
                 continue
             id = line[columns["text_id"]]
             tokens = line[columns['text']]
-            pos_tags = line[columns['pos']].split(' ') if 'pos' in columns else ['X'] * len(tokens)
-            dep_rels = line[columns['deprel']].split(' ') if 'deprel' in columns else ['X'] * len(tokens)
+            pos_tags = line[columns['pos']].split(' ') if 'pos' in columns else ['X'] * len(tokens.split())
+            dep_rels = line[columns['deprel']].split(' ') if 'deprel' in columns else ['X'] * len(tokens.split())
             dep_rels = [dep_rel.split(':')[0] for dep_rel in dep_rels]
             native_language = line[columns['l1']] if 'l1' in columns else 'X'
             score = line[columns[self.score_name]]
@@ -113,7 +121,7 @@ class TSVProcessor(object):
             return lines
 
 def convert_examples_to_features(examples, model, max_seq_length, special_tokens, logger,
-                                 vocab=None, tokenizer=None):
+                                 vocab=None, tokenizer=None, pretokenize=False):
     if model in ['bert', 'auto']:
         special_tokens_count = 2
     #elif model == 'pool':
@@ -131,11 +139,20 @@ def convert_examples_to_features(examples, model, max_seq_length, special_tokens
             logger.info("Writing example %d of %d" % (ex_index, len(examples)))
         tokens, pos_tags, dep_rels, native_language = [], [], [], []
         segment_ids = None
-
-        for i, word in enumerate(example.tokens.split(' ')):
+        
+        if pretokenize:
+            token_list = get_pretokenize_result(example.tokens)
+        else:
+            token_list = example.tokens.split(' ')
+        
+        for i, word in enumerate(token_list):
             if len(tokens) == max_seq_length - special_tokens_count:
                 break
             word_pieces = tokenizer.tokenize(word) if tokenizer else [word]
+            
+            if pretokenize and len(word_pieces) > 1:
+                word_pieces = ["[UNK]"]
+            
             tokens.extend(word_pieces)
             # don't predict on special tokens for auxiliary objectives
             if word in special_tokens:
@@ -237,17 +254,18 @@ def load_and_cache_vocab(data_dir, logger, score_name):
     pickle.dump(vocab_to_int, open(vocab_file, 'wb'))
     return vocab_to_int
 
-def load_and_cache_examples(model, data_dir, max_seq_length, special_tokens, logger, score_name, vocab=None, tokenizer=None, evaluate=False, test=False, reload=False):
+def load_and_cache_examples(model, data_dir, max_seq_length, special_tokens, logger, score_name, vocab=None, tokenizer=None, evaluate=False, test=False, reload=False, pretokenize=False):
     assert not (evaluate and test), "Cannot load validation data and test data at the same time."
     processor = TSVProcessor(score_name)
     # Load data features from cache or dataset file
     file_type = 'valid' if evaluate else 'train'
     file_type = 'test'  if test else file_type
-    cached_features_file = os.path.join(data_dir, 'cached_{}_{}_{}_{}'.format(
+    cached_features_file = os.path.join(data_dir, 'cached_{}_{}_{}_{}_pt{}'.format(
         model,
         file_type,
         str(max_seq_length),
-        score_name))
+        score_name,
+        pretokenize))
     if not reload and os.path.exists(cached_features_file):
         logger.info("Loading features from cached file %s", cached_features_file)
         features = torch.load(cached_features_file)
@@ -260,7 +278,7 @@ def load_and_cache_examples(model, data_dir, max_seq_length, special_tokens, log
         else:
             examples = processor.get_train_examples(data_dir)
 
-        features = convert_examples_to_features(examples, model, max_seq_length, special_tokens, logger, vocab, tokenizer)
+        features = convert_examples_to_features(examples, model, max_seq_length, special_tokens, logger, vocab, tokenizer, pretokenize)
         logger.info("Saving features into cached file %s", cached_features_file)
         torch.save(features, cached_features_file)
 

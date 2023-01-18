@@ -62,7 +62,7 @@ text_column = args.text_column
 kfold = args.kfold
 sheet_name = args.sheet_name
 
-xlsx_headers = ["text_id", "text" ] + scores
+xlsx_headers = ["text_id", "wav_path", "text" ] + scores
 tsv_dict = {h:[] for h in xlsx_headers}
 anno_df = pd.read_excel(anno_path, sheet_name=sheet_name, converters={id_column:str})
 
@@ -70,11 +70,14 @@ anno_df = pd.read_excel(anno_path, sheet_name=sheet_name, converters={id_column:
 for i, text_id in tqdm(enumerate(anno_df[id_column])):
     
     text = anno_df[text_column][i]
+    wav_path = anno_df["wav_path"][i]
+    
     if not isinstance(text_id, str) or not isinstance(text, str):
         print(i)
     
     text = " ".join(text.split())
     tsv_dict["text_id"].append(text_id)
+    tsv_dict["wav_path"].append(wav_path)
     tsv_dict["text"].append(text)
     
     for score in scores:
