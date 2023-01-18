@@ -38,6 +38,14 @@ parser.add_argument("--scores",
                     default="content pronunciation vocabulary",
                     type=str)
 
+parser.add_argument("--all_bins",
+                    default="1.5,2.5,3.5,4.5,5.5,6.5,7.5",
+                    type=str)
+
+parser.add_argument("--cefr_bins",
+                    default="2.5,4.5,6.5",
+                    type=str)
+
 args = parser.parse_args()
 
 
@@ -139,7 +147,7 @@ for score in scores:
 print("ORIGIN")
 print("scores", scores)
 
-all_bins = np.array([1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5])
+all_bins = np.array([float(ab) for ab in args.all_bins.split(",")])
 for score in scores: 
     for nf in n_folds: 
         total_losses[score][nf] = {}
@@ -167,7 +175,7 @@ for score in scores:
 
 print()
 print("CEFR")
-cefr_bins = np.array([2.5, 4.5, 6.5])
+cefr_bins = np.array([ float(cb) for cb in args.cefr_bins.split(",")])
 
 for score in scores:
     
