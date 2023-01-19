@@ -66,6 +66,7 @@ def filled_csv(csv_dict, result_root, score, nf, text_ids):
             
             assert csv_dict[nf][text_id]["anno"][score] == anno_score
             csv_dict[nf][text_id]["pred"][score] = pred_score
+            
     return True
 
 
@@ -118,10 +119,15 @@ for nf in n_folds:
                 continue
                 
             text_id, text = row[columns["text_id"]], row[columns["text"]]
+            
+            if text_id in csv_dict[nf]:
+                print(text_id)
+                input()
              
             text_ids[nf].append(text_id)
-            csv_dict[nf][text_id]["anno"] = { s: float(row[columns[s]]) for s in scores }        
+            csv_dict[nf][text_id]["anno"] = { s: float(row[columns[s]]) for s in scores }
             csv_dict[nf][text_id]["pred"] = { s: float(row[columns[s]]) for s in scores }
+            
 
 # fiiled csv_dict
 total_losses = defaultdict(dict)

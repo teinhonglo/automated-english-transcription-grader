@@ -122,7 +122,7 @@ if [ $stage -le 2 ] && [ $stop_stage -ge 2 ]; then
             model_dir=$model_args_dir/best_train
             predictions_file="$runs_root/$output_dir/predictions.txt"
             
-            python3 run_speech_grader.py --do_test --overwrite-cache --model $model \
+            python3 run_speech_grader.py --do_test --overwrite_cache --model $model \
                                          --do_lower_case --overwrite_cache \
                                          --model_path $model_path \
                                          --model_args_dir $model_args_dir \

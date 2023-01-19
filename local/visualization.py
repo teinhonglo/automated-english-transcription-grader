@@ -45,8 +45,8 @@ pred_columns = ["pred", "pred(cefr)"]
 read_columns = anno_columns + pred_columns
 
 kfold_info = {}
-all_bins = np.array([ float(ab) for ab in args.all_bins])
-cefr_bins = np.array([ float(cb) for cb in args.cefr_bins])
+all_bins = np.array([ float(ab) for ab in args.all_bins.split(",")])
+cefr_bins = np.array([ float(cb) for cb in args.cefr_bins.split(",")])
 
 for score in scores:
     kfold_info[score] = defaultdict(dict)

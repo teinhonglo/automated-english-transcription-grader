@@ -100,7 +100,10 @@ for i, text_id in tqdm(enumerate(anno_df[id_column])):
             if len(text.split()) == 0:
                 continue
             
-            tsv_dict["text_id"].append(text_id + "_" + str(j+1))
+            new_text_id = text_id + "_" + str(j+1)
+            assert new_text_id not in tsv_dict["text_id"]
+            
+            tsv_dict["text_id"].append(new_text_id)
             tsv_dict["wav_path"].append(wav_path)
             tsv_dict["text"].append(text)
             
@@ -110,6 +113,8 @@ for i, text_id in tqdm(enumerate(anno_df[id_column])):
                 anno_score = np.digitize(anno_score, all_bins)
                 tsv_dict[score].append(anno_score)
     else:
+        assert text_id not in tsv_dict["text_id"]
+        
         tsv_dict["text_id"].append(text_id)
         tsv_dict["wav_path"].append(wav_paths)
         tsv_dict["text"].append(texts)
