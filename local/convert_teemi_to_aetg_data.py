@@ -110,7 +110,9 @@ for i, text_id in tqdm(enumerate(anno_df[id_column])):
             for score in scores:
                 anno_score = anno_df[score][i]
                 #anno_score = (np.digitize(anno_score, cls_bins) + 1) / 2
-                anno_score = np.digitize(anno_score, all_bins)
+                if args.do_dig:
+                    anno_score = np.digitize(anno_score, all_bins)
+
                 tsv_dict[score].append(anno_score)
     else:
         assert text_id not in tsv_dict["text_id"]
@@ -122,7 +124,8 @@ for i, text_id in tqdm(enumerate(anno_df[id_column])):
         for score in scores:
             anno_score = anno_df[score][i]
             #anno_score = (np.digitize(anno_score, cls_bins) + 1) / 2
-            anno_score = np.digitize(anno_score, all_bins)
+            if args.do_dig:
+                anno_score = np.digitize(anno_score, all_bins)
             tsv_dict[score].append(anno_score)
     
     before_text_id = text_id
