@@ -19,8 +19,16 @@ parser.add_argument("--score",
                     type=str)
  
 parser.add_argument("--n_resamples",
-                    default="120",
-                    type=int)
+                    default="max",
+                    type=str)
+
+parser.add_argument("--resample_scales",
+                    default="2,4,6,8",
+                    type=str)
+
+parser.add_argument("--origin_scales",
+                    default="1,2,3,4,5,6,7,8",
+                    type=str)
 
 parser.add_argument("--tsv_fn",
                     default="train.tsv",
@@ -72,11 +80,22 @@ data_dir = args.data_dir
 score = args.score
 n_resamples = args.n_resamples
 tsv_fn = args.tsv_fn
-resample_scales = [1,2,3,4,5,6,7,8]
+resample_scales = [ int(rs) for rs in args.resample_scales.split(",")]
+origin_scales = [ int(rs) for rs in args.origin_scales.split(",")]
 
 tsv_path = os.path.join(data_dir, tsv_fn)
 df = pd.read_csv(tsv_path, sep='\t', dtype={"text_id":str})
-df_balanced = do_resample(df=df, score=score, n_resamples=n_resamples, resample_scales=resample_scales)
-df_balanced.to_csv(tsv_path, sep="\t", index=False)
+
+val_df = df[score].value_counts()
+
+if n_resamples == "max":
+    n_resamples = int(val_df[val_df.idxmax()])
+elif n_resamples == "min":
+    n_resamples = int(val_df[val_df.idxmin()])
+else:
+    n_resamples = int(n_resamples)
+
+df_balanced = do_resample(df=df, score=score, n_resamples=n_resamples, scales=origin_scales, resample_scales=resample_scales)
+#df_balanced.to_csv(tsv_path, sep="\t", index=False)
 #df_balanced.to_csv("train.tsv", sep="\t", index=False)
 

@@ -97,8 +97,8 @@ class TSVProcessor(object):
                 continue
             id = line[columns["text_id"]]
             tokens = line[columns['text']]
-            pos_tags = line[columns['pos']].split(' ') if 'pos' in columns else ['X'] * len(tokens.split())
-            dep_rels = line[columns['deprel']].split(' ') if 'deprel' in columns else ['X'] * len(tokens.split())
+            pos_tags = line[columns['pos']].split(' ') if 'pos' in columns else ['X'] * len(tokens)
+            dep_rels = line[columns['deprel']].split(' ') if 'deprel' in columns else ['X'] * len(tokens)
             dep_rels = [dep_rel.split(':')[0] for dep_rel in dep_rels]
             native_language = line[columns['l1']] if 'l1' in columns else 'X'
             score = line[columns[self.score_name]]

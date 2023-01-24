@@ -11,13 +11,28 @@ test_on_valid="true"
 merge_below_b1="false"
 trans_type="trans_stt"
 do_round="true"
+# resample-related
+n_resamples=max
+origin_scales="1,2,3,4,5,6,7,8,9"
+resample_scales="1,2,3,4,5,6,7,8,9"
 # model-related
 model=pool
 exp_tag=bert-pool-model
 model_path=bert-base-uncased
-max_score=9
+max_score=5
 max_seq_length=128
 num_epochs=6
+score_loss="mse"
+# training-related
+warmup_steps=0  # 0
+weight_decay=0  # 0
+max_grad_norm=1.0   # 1.0
+train_batch_size=8  # 8
+gradient_accumulation_steps=1  # 1
+num_epochs=6        # 6
+learning_rate=5e-5  # 5e-5
+# other
+rprefix=
 score_loss=mse
 test_book=1
 part=1 # 1 = 基礎聽答, 2 = 情境式提問與問答, 3 = 主題式口說任務, 4 = 摘要報告 (不自動評分) 
@@ -51,8 +66,8 @@ if [ "$do_dig" == "true" ]; then
     # [0, 1, 1.5, 2, 2.78, 3.5, 4, 4.25, 5, 4.75] -> [0, 1, 2, 3, 4, 6, 7, 7, 9, 8]
     extra_options="$extra_options --do_dig"
 else
-    data_dir=${data_dir}_wod
-    exp_root=${exp_root}_wod
+    data_dir=${data_dir}_od
+    exp_root=${exp_root}_od
     runs_root=${runs_root}_od
 fi
 
@@ -66,7 +81,7 @@ else
 fi
 
 
-if [ $stage -le 0 ] && [ $stop_stage -ge 0 ]; then  
+if [ $stage -le -1 ] && [ $stop_stage -ge -1 ]; then  
     if [ -d $data_dir ]; then
         echo "[NOTICE] $data_dir is already existed."
         echo "Skip data preparation."
@@ -85,27 +100,66 @@ if [ $stage -le 0 ] && [ $stop_stage -ge 0 ]; then
     fi
 fi
 
+
+if [ $stage -le 0 ] && [ $stop_stage -ge 0 ]; then
+    for sn in $score_names; do
+        new_data_dir=${data_dir}_${rprefix}r${n_resamples}_${sn}
+        new_exp_root=${exp_root}_${rprefix}r${n_resamples}_${sn}
+        new_runs_root=${runs_root}_${rprefix}r${n_resamples}_${sn}
+        
+        echo $new_data_dir
+        if [ ! -d $new_data_dir ]; then
+            mkdir -p $new_data_dir;
+            rsync -a --exclude=*cached* $data_dir/ $new_data_dir/
+            for fd in $folds; do
+                python local/do_resample.py --data_dir $new_data_dir/$fd \
+                                        --score $sn \
+                                        --origin_scales $origin_scales \
+                                        --resample_scales $resample_scales \
+                                        --n_resamples $n_resamples
+            done
+        else
+            echo "$new_data_dir is already existed"
+        fi
+    done
+fi
+
 if [ $stage -le 1 ] && [ $stop_stage -ge 1 ]; then  
      
     for sn in $score_names; do
         for fd in $folds; do
             # model_args_dir
+            new_data_dir=${data_dir}_${rprefix}r${n_resamples}_${sn}
+            new_exp_root=${exp_root}_${rprefix}r${n_resamples}_${sn}
+            new_runs_root=${runs_root}_${rprefix}r${n_resamples}_${sn}
             output_dir=$exp_tag/${sn}/${fd}
-            python3 run_speech_grader.py --do_train --save_best_on_evaluate --save_best_on_train \
+            model_args_dir=$exp_tag/${sn}/${fd}
+
+            if [ -d $new_exp_root/$model_args_dir/final ]; then
+                echo "$new_exp_root/$model_args_dir/final is already existed."
+                continue
+            fi
+            
+            python3 run_speech_grader.py --do_train --save_best_on_evaluate --save_best_on_train --pretokenize \
                                          --do_lower_case --overwrite_cache \
                                          --model $model \
                                          --model_path $model_path \
                                          --num_train_epochs $num_epochs \
+                                         --weight_decay $weight_decay \
+                                         --max_grad_norm $max_grad_norm \
                                          --logging_steps 20 \
-                                         --gradient_accumulation_steps 1 \
+                                         --train_batch_size $train_batch_size \
+                                         --gradient_accumulation_steps $gradient_accumulation_steps \
+                                         --warmup_steps $warmup_steps \
+                                         --learning_rate $learning_rate \
                                          --max_seq_length $max_seq_length \
                                          --max_score $max_score --evaluate_during_training \
+                                         --score_loss $score_loss \
                                          --output_dir $output_dir \
                                          --score_name $sn \
-                                         --score_loss $score_loss \
-                                         --data_dir $data_dir/$fd \
-                                         --runs_root $runs_root \
-                                         --exp_root $exp_root
+                                         --data_dir $new_data_dir/$fd \
+                                         --runs_root $new_runs_root \
+                                         --exp_root $new_exp_root
         done
     done
 fi
@@ -116,42 +170,53 @@ if [ $stage -le 2 ] && [ $stop_stage -ge 2 ]; then
     
     for sn in $score_names; do
         for fd in $folds; do
+            new_data_dir=${data_dir}_${rprefix}r${n_resamples}_${sn}
+            new_exp_root=${exp_root}_${rprefix}r${n_resamples}_${sn}
+            new_runs_root=${runs_root}_${rprefix}r${n_resamples}_${sn}
+            
             output_dir=$exp_tag/${sn}/${fd}
             model_args_dir=$exp_tag/${sn}/${fd}
             model_dir=$model_args_dir/best_train
-            predictions_file="$runs_root/$output_dir/predictions.txt"
+            predictions_file="$new_runs_root/$output_dir/predictions.txt"
             
-            python3 run_speech_grader.py --do_test --overwrite_cache --model $model \
-                                         --do_lower_case --overwrite_cache \
+            python3 run_speech_grader.py --do_test --pretokenize --model $model \
+                                         --do_lower_case \
                                          --model_path $model_path \
                                          --model_args_dir $model_args_dir \
                                          --max_seq_length $max_seq_length \
                                          --max_score $max_score \
                                          --model_dir $model_dir \
                                          --predictions_file $predictions_file \
-                                         --data_dir $data_dir/$fd \
+                                         --data_dir $new_data_dir/$fd \
                                          --score_name $sn \
-                                         --score_loss $score_loss \
-                                         --runs_root $runs_root \
+                                         --runs_root $new_runs_root \
                                          --output_dir $output_dir \
-                                         --exp_root $exp_root
+                                         --exp_root $new_exp_root
         done
     done 
 fi
 
 if [ $stage -le 3 ] && [ $stop_stage -ge 3 ]; then  
-    python local/speaking_predictions_to_report.py  --data_dir $data_dir \
-                                                    --result_root $runs_root/$exp_tag \
+    for sn in $score_names; do
+        new_data_dir=${data_dir}_${rprefix}r${n_resamples}_${sn}
+        new_runs_root=${runs_root}_${rprefix}r${n_resamples}_${sn}
+        python local/speaking_predictions_to_report.py  --data_dir $new_data_dir \
+                                                    --result_root $new_runs_root/$exp_tag \
                                                     --all_bins "$all_bins" \
                                                     --cefr_bins "$cefr_bins" \
                                                     --folds "$folds" \
-                                                    --scores "$score_names" > $runs_root/$exp_tag/report.log
+                                                    --scores "$score_names" > $new_runs_root/$exp_tag/report.log
+    done
 fi
 
 if [ $stage -le 4 ] && [ $stop_stage -ge 4 ]; then  
     echo $runs_root/$exp_tag
-    python local/visualization.py   --result_root $runs_root/$exp_tag \
-                                    --all_bins "$all_bins" \
-                                    --cefr_bins "$cefr_bins" \
-                                    --scores "$score_names"
+    for sn in $score_names; do
+        new_data_dir=${data_dir}_${rprefix}r${n_resamples}_${sn}
+        new_runs_root=${runs_root}_${rprefix}r${n_resamples}_${sn}
+        python local/visualization.py   --result_root $new_runs_root/$exp_tag \
+                                        --all_bins "$all_bins" \
+                                        --cefr_bins "$cefr_bins" \
+                                        --scores "$sn"
+    done
 fi

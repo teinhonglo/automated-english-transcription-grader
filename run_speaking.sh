@@ -7,7 +7,6 @@ corpus_dir="../corpus/speaking/GEPT_B1"
 score_names="content pronunciation vocabulary"
 anno_fn="new_111年口說語料.xlsx"
 kfold=5
-folds=`seq 1 $kfold`
 part=3
 test_on_valid="true"
 merge_below_b1="false"
@@ -28,6 +27,7 @@ extra_options=
 
 set -euo pipefail
 
+folds=`seq 1 $kfold`
 data_dir=data-speaking/gept-p${part}/$trans_type
 exp_root=exp-speaking/gept-p${part}/$trans_type
 runs_root=runs-speaking/gept-p${part}/$trans_type

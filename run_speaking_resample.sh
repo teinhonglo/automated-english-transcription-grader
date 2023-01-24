@@ -7,7 +7,6 @@ corpus_dir="../corpus/speaking/GEPT_B1"
 score_names="content"
 anno_fn="new_111年口說語料.xlsx"
 kfold=5
-folds=`seq 1 $kfold`
 part=2
 test_on_valid="true"
 merge_below_b1="false"
@@ -16,7 +15,7 @@ do_round="true"
 n_resamples=100
 # model-related
 model=pool          # auto
-exp_tag=bert-pool  # bert-model transformers=4.3.3, tokenizers=0.10.3
+exp_tag=bert-pool-pretokenize  # bert-model transformers=4.3.3, tokenizers=0.10.3
 model_path=bert-base-uncased # bert-base-uncased
 max_score=8
 max_seq_length=512
@@ -37,13 +36,14 @@ extra_options=
 . ./path.sh
 . ./parse_options.sh
 
+folds=`seq 1 $kfold`
 
 data_dir=data-speaking/gept-p${part}/$trans_type
 exp_root=exp-speaking/gept-p${part}/$trans_type
 runs_root=runs-speaking/gept-p${part}/$trans_type
 
 if [ "$test_on_valid" == "true" ]; then
-    extra_options="--test_on_valid"
+    extra_options="$extra_options --test_on_valid"
     data_dir=${data_dir}_tov
     exp_root=${exp_root}_tov
     runs_root=${runs_root}_tov
@@ -124,8 +124,8 @@ if [ $stage -le 1 ] && [ $stop_stage -ge 1 ]; then
                 continue
             fi
             
-            python3 run_speech_grader.py --do_train --save_best_on_evaluate --save_best_on_train \
-                                         --do_lower_case --overwrite_cache\
+            python3 run_speech_grader.py --do_train --save_best_on_evaluate --save_best_on_train --pretokenize \
+                                         --do_lower_case --overwrite_cache \
                                          --model $model \
                                          --model_path $model_path \
                                          --num_train_epochs $num_epochs \
@@ -163,7 +163,7 @@ if [ $stage -le 2 ] && [ $stop_stage -ge 2 ]; then
             model_dir=$model_args_dir/best_train
             predictions_file="$new_runs_root/$output_dir/predictions.txt"
             
-            python3 run_speech_grader.py --do_test --model $model \
+            python3 run_speech_grader.py --do_test --pretokenize --model $model \
                                          --do_lower_case \
                                          --model_path $model_path \
                                          --model_args_dir $model_args_dir \

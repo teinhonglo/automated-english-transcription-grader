@@ -12,8 +12,8 @@ test_on_valid="true"
 trans_type="origin"
 do_l2r="false"
 # model-related
-model=bert
-model_type=bert-model
+model=pool
+exp_tag=bert-pool
 model_path=bert-base-uncased
 num_epochs=3
 max_score=8
@@ -63,7 +63,7 @@ if [ $stage -le 1 ] && [ $stop_stage -ge 1 ]; then
      
     for sn in $score_names; do
         for fd in $folds; do
-            output_dir=$model_type/${sn}/${fd}
+            output_dir=$exp_tag/${sn}/${fd}
             python3 run_speech_grader.py --do_train --save_best_on_evaluate --save_best_on_train \
                                          --do_lower_case \
                                          --model $model \
@@ -88,8 +88,8 @@ if [ $stage -le 2 ] && [ $stop_stage -ge 2 ]; then
     
     for sn in $score_names; do
         for fd in $folds; do
-            output_dir=$model_type/${sn}/${fd}
-            model_args_dir=$model_type/${sn}/${fd}
+            output_dir=$exp_tag/${sn}/${fd}
+            model_args_dir=$exp_tag/${sn}/${fd}
             model_dir=$model_args_dir/best_train
             predictions_file="$runs_root/$output_dir/predictions.txt"
             
@@ -112,12 +112,12 @@ fi
 
 if [ $stage -le 3 ] && [ $stop_stage -ge 3 ]; then  
     python local/writing_predictions_to_report.py   --data_dir $data_dir \
-                                                    --result_root $runs_root/$model_type \
+                                                    --result_root $runs_root/$exp_tag \
                                                     --folds "$folds" \
-                                                    --scores "$score_names" > $runs_root/$model_type/report.log
+                                                    --scores "$score_names" > $runs_root/$exp_tag/report.log
 fi
 
 if [ $stage -le 4 ] && [ $stop_stage -ge 4 ]; then  
-    python local/visualization.py   --result_root $runs_root/$model_type \
+    python local/visualization.py   --result_root $runs_root/$exp_tag \
                                     --scores "$score_names"
 fi
