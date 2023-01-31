@@ -102,6 +102,7 @@ class TSVProcessor(object):
             dep_rels = [dep_rel.split(':')[0] for dep_rel in dep_rels]
             native_language = line[columns['l1']] if 'l1' in columns else 'X'
             score = line[columns[self.score_name]]
+            
             examples.append(
                 InputExample(id=id, tokens=tokens, score=score, pos_tags=pos_tags,
                              dep_rels=dep_rels, native_language=native_language))

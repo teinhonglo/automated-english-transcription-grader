@@ -96,6 +96,6 @@ else:
     n_resamples = int(n_resamples)
 
 df_balanced = do_resample(df=df, score=score, n_resamples=n_resamples, scales=origin_scales, resample_scales=resample_scales)
-#df_balanced.to_csv(tsv_path, sep="\t", index=False)
+df_balanced.to_csv(tsv_path, sep="\t", index=False)
 #df_balanced.to_csv("train.tsv", sep="\t", index=False)
 

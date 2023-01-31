@@ -45,6 +45,13 @@ parser.add_argument("--all_bins",
 parser.add_argument("--cefr_bins",
                     default="2.5,4.5,6.5",
                     type=str)
+                    
+parser.add_argument("--merged_speaker",
+                    action="store_true")
+
+parser.add_argument("--question_type",
+                    default="tb1p1",
+                    type=str)
 
 args = parser.parse_args()
 
@@ -96,11 +103,42 @@ def evaluation(total_losses_score_nf, evaluate_dict, target_score="organization"
      
     return total_losses_score_nf, all_score_preds, all_score_annos, all_text_ids
 
+def do_merge_speaker(csv_dict, nq, scores):
+    #csv_dict[nf][text_id]["anno"] = { s: float(row[columns[s]]) for s in scores }
+    new_csv_dict = defaultdict(dict)
+    for nf in list(csv_dict.keys()):
+        for text_id in list(csv_dict[nf].keys()):
+            # tb1_qt1_u48_1
+            spk_id = text_id.split("_")[2]
+
+            if spk_id not in new_csv_dict[nf]:
+                new_csv_dict[nf][spk_id] = {"anno":{}, "pred":{}}
+            
+            for score in scores:
+                a_score = csv_dict[nf][text_id]["anno"][score]
+                p_score = csv_dict[nf][text_id]["pred"][score]
+
+                if score not in new_csv_dict[nf][spk_id]["anno"]:
+                    new_csv_dict[nf][spk_id]["anno"][score] = (1. / nq) * a_score
+                    new_csv_dict[nf][spk_id]["pred"][score] = (1. / nq) * p_score
+                else:
+                    new_csv_dict[nf][spk_id]["anno"][score] += (1. / nq) * a_score
+                    new_csv_dict[nf][spk_id]["pred"][score] += (1. / nq) * p_score
+                    
+    return new_csv_dict
+
+
+number_questions = {
+                    "tb1p1": 5,
+                    "tb1p2": 3
+                   }
 
 data_dir = args.data_dir
 n_folds = args.folds.split()
 result_root = args.result_root
 scores = args.scores.split()
+merged_speaker = args.merged_speaker
+question_type = args.question_type
 
 csv_header = "text_id " + " ".join(scores)
 csv_header = csv_header.split()
@@ -130,7 +168,6 @@ for nf in n_folds:
             csv_dict[nf][text_id]["anno"] = { s: float(row[columns[s]]) for s in scores }
             csv_dict[nf][text_id]["pred"] = { s: float(row[columns[s]]) for s in scores }
             
-
 # fiiled csv_dict
 total_losses = defaultdict(dict)
 total_df_losses = defaultdict(dict)
@@ -146,6 +183,10 @@ for nf in n_folds:
                 scores_.append(score)
              
 scores = list(scores_)
+
+if merged_speaker:
+    csv_dict = do_merge_speaker(csv_dict, number_questions[question_type], scores)
+
 kfold_info = {}
 
 for score in scores:
@@ -200,7 +241,7 @@ for score in scores:
         kfold_info[score]["All"]["pred(cefr)"] += all_score_preds.tolist()
         
     result_dir = os.path.join(result_root, score)
-    with pd.ExcelWriter(os.path.join(result_dir, "kfold_detail.xlsx")) as writer:
+    with pd.ExcelWriter(os.path.join(result_dir, "kfold_detail_spk.xlsx")) as writer:
         for f in list(kfold_info[score].keys()):
             df = pd.DataFrame(kfold_info[score][f])
             df.to_excel(writer, sheet_name=f)   

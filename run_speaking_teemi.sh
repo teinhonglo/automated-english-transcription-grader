@@ -15,7 +15,7 @@ do_round="true"
 model=pool
 exp_tag=bert-pool-model
 model_path=bert-base-uncased
-max_score=9
+max_score=8
 max_seq_length=128
 num_epochs=6
 score_loss=mse
@@ -23,8 +23,8 @@ test_book=1
 part=1 # 1 = 基礎聽答, 2 = 情境式提問與問答, 3 = 主題式口說任務, 4 = 摘要報告 (不自動評分) 
 do_split=true
 do_dig=true
-ori_all_bins="1,1.5,2,2.5,3,3.5,4,4.5,5"
-all_bins="1.5,2.5,3.5,4.5,5.5,6.5,7.5,8.5"
+ori_all_bins="1,2,2.5,3,3.5,4,4.5,5" # 1 和 1.5 當作同一類
+all_bins="1.5,2.5,3.5,4.5,5.5,6.5,7.5"
 cefr_bins="1.5,3.5,5.5,7.5"
 extra_options=
 
@@ -53,7 +53,7 @@ if [ "$do_dig" == "true" ]; then
 else
     data_dir=${data_dir}_wod
     exp_root=${exp_root}_wod
-    runs_root=${runs_root}_od
+    runs_root=${runs_root}_wod
 fi
 
 if [ "$do_split" == "true" ]; then
@@ -72,7 +72,7 @@ if [ $stage -le 0 ] && [ $stop_stage -ge 0 ]; then
         echo "Skip data preparation."
         sleep 5
     else
-        python local/convert_teemi_to_aetg_data.py \
+        python local/convert_teemi_to_aetg_datav2.py \
                     --corpus_dir $corpus_dir \
                     --data_dir $data_dir \
                     --anno_fn $anno_fn \
@@ -118,7 +118,7 @@ if [ $stage -le 2 ] && [ $stop_stage -ge 2 ]; then
         for fd in $folds; do
             output_dir=$exp_tag/${sn}/${fd}
             model_args_dir=$exp_tag/${sn}/${fd}
-            model_dir=$model_args_dir/best_train
+            model_dir=$model_args_dir/best
             predictions_file="$runs_root/$output_dir/predictions.txt"
             
             python3 run_speech_grader.py --do_test --overwrite_cache --model $model \
@@ -153,5 +153,24 @@ if [ $stage -le 4 ] && [ $stop_stage -ge 4 ]; then
     python local/visualization.py   --result_root $runs_root/$exp_tag \
                                     --all_bins "$all_bins" \
                                     --cefr_bins "$cefr_bins" \
+                                    --scores "$score_names"
+fi
+
+if [ $stage -le 5 ] && [ $stop_stage -ge 5 ]; then  
+    python local/speaking_predictions_to_report_spk.py  --merged_speaker --data_dir $data_dir \
+                                                    --result_root $runs_root/$exp_tag \
+                                                    --all_bins "$all_bins" \
+                                                    --cefr_bins "$cefr_bins" \
+                                                    --folds "$folds" \
+                                                    --question_type tb${test_book}p${part} \
+                                                    --scores "$score_names" > $runs_root/$exp_tag/report_spk.log
+fi
+
+if [ $stage -le 6 ] && [ $stop_stage -ge 6 ]; then  
+    echo $runs_root/$exp_tag
+    python local/visualization.py   --result_root $runs_root/$exp_tag \
+                                    --all_bins "$all_bins" \
+                                    --cefr_bins "$cefr_bins" \
+                                    --affix "_spk" \
                                     --scores "$score_names"
 fi

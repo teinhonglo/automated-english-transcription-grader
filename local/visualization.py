@@ -35,11 +35,17 @@ parser.add_argument("--cefr_bins",
                     default="2.5,4.5,6.5",
                     type=str)
 
+parser.add_argument("--affix",
+                    default="",
+                    type=str)
+
 args = parser.parse_args()
 
 result_root = args.result_root
 plot_sheets = args.plot_sheets.split()
 scores = args.scores.split()
+affix = args.affix
+
 anno_columns = ["anno", "anno(cefr)"]
 pred_columns = ["pred", "pred(cefr)"]
 read_columns = anno_columns + pred_columns
@@ -51,7 +57,7 @@ cefr_bins = np.array([ float(cb) for cb in args.cefr_bins.split(",")])
 for score in scores:
     kfold_info[score] = defaultdict(dict)
     for nf in plot_sheets:
-        xlsx_path = os.path.join(result_root, score, "kfold_detail.xlsx")
+        xlsx_path = os.path.join(result_root, score, "kfold_detail" + affix + ".xlsx")
         df = pd.read_excel(xlsx_path, sheet_name=nf)
         for rc in read_columns:
             kfold_info[score][nf][rc] = df[rc]
@@ -61,7 +67,7 @@ for score in scores:
 for score in list(kfold_info.keys()):
     for nf in list(kfold_info[score].keys()):
         for anno_type, pred_type in zip(anno_columns, pred_columns):
-            file_name = os.path.join(result_root, "-".join([score, pred_type, nf]))
+            file_name = os.path.join(result_root, score, "-".join([score, pred_type, nf]) + affix)
             png_name = file_name + ".png"
             excel_name = file_name + ".xlsx"
              
