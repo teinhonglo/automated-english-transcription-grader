@@ -112,7 +112,7 @@ for i, text_id in tqdm(enumerate(anno_df[id_column])):
                 #anno_score = (np.digitize(anno_score, cls_bins) + 1) / 2
                 if args.do_dig:
                     anno_score = np.digitize(anno_score, all_bins)
-
+                 
                 tsv_dict[score].append(anno_score)
     else:
         assert text_id not in tsv_dict["text_id"]
@@ -126,6 +126,7 @@ for i, text_id in tqdm(enumerate(anno_df[id_column])):
             #anno_score = (np.digitize(anno_score, cls_bins) + 1) / 2
             if args.do_dig:
                 anno_score = np.digitize(anno_score, all_bins)
+             
             tsv_dict[score].append(anno_score)
     
     before_text_id = text_id
@@ -149,12 +150,15 @@ for i, (train_index, valid_index) in enumerate(kf.split(all_train_df)):
         os.makedirs(result_dir)
     
     train_df, valid_df = all_train_df.iloc[train_index], all_train_df.iloc[valid_index]
-    
-    train_df.to_csv(os.path.join(result_dir, "train.tsv"), header=xlsx_headers, sep="\t", index=False)
-    valid_df.to_csv(os.path.join(result_dir, "valid.tsv"), header=xlsx_headers, sep="\t", index=False)
-    
+     
     if args.test_on_valid:
         test_df = valid_df
-     
+    
+    train_df = train_df[train_df[scores[0]] != 0]
+    valid_df = valid_df[valid_df[scores[0]] != 0]
+    test_df = test_df[test_df[scores[0]] != 0]
+    
+    train_df.to_csv(os.path.join(result_dir, "train.tsv"), header=xlsx_headers, sep="\t", index=False)
+    valid_df.to_csv(os.path.join(result_dir, "valid.tsv"), header=xlsx_headers, sep="\t", index=False) 
     test_df.to_csv(os.path.join(result_dir, "test.tsv"), header=xlsx_headers, sep="\t", index=False)
 
